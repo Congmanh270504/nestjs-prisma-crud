@@ -1,0 +1,41 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+model Book {
+  id          Int     @id @default(autoincrement())
+  title       String
+  description String?
+}
+
+// -----------------------------------------------
+// FACE RECOGNITION MODELS
+// -----------------------------------------------
+
+/// Lưu thông tin người dùng kèm vector đặc trưng khuôn mặt (512 chiều - ArcFace)
+model FaceUser {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  avatarUrl String?  @map("avatar_url")
+
+  /// Vector embedding 512 chiều từ DeepFace ArcFace model
+  /// Dùng kiểu Unsupported vì Prisma chưa có native vector type
+  embedding Unsupported("vector(512)")?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("face_users")
+}
+
