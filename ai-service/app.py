@@ -1,3 +1,10 @@
+import os
+# Cấu hình tối ưu bộ nhớ RAM cho TensorFlow trên Server 512MB
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from deepface import DeepFace
@@ -17,23 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup_event():
-    print("⏳ Pre-loading ArcFace model weights...")
-    try:
-        DeepFace.build_model("ArcFace")
-        print("✅ ArcFace model weights pre-loaded successfully!")
-    except Exception as e:
-        print(f"⚠️ Pre-load warning: {e}")
-
 @app.get("/")
 def home():
     return {"status": "AI Service is running", "model": "ArcFace (512D)"}
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/extract-embedding")
 async def extract_embedding(file: UploadFile = File(...)):
