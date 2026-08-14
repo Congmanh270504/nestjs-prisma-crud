@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from deepface import DeepFace
 import numpy as np
@@ -42,7 +42,7 @@ async def extract_embedding(file: UploadFile = File(...)):
             img_path=img,
             model_name="ArcFace",
             enforce_detection=False,
-            detector_backend="opencv"
+            detector_backend="skip"
         )
 
         embedding = embedding_objs[0]["embedding"]

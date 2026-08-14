@@ -176,10 +176,11 @@ export default function RegisterFaceModal({ onClose, onSuccess }: Props) {
             <Button
               className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={handleSubmit}
-              disabled={isLoading || !previewBlob || !name.trim()}
+              disabled={isLoading || !previewBlob}
             >
               {isLoading ? <><span className="spinner mr-2" />Đang đăng ký...</> : "✅ Đăng ký khuôn mặt"}
             </Button>
+
           </div>
         </div>
       </DialogContent>
