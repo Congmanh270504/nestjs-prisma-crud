@@ -17,9 +17,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def startup_event():
+    print("⏳ Pre-loading ArcFace model weights...")
+    try:
+        DeepFace.build_model("ArcFace")
+        print("✅ ArcFace model weights pre-loaded successfully!")
+    except Exception as e:
+        print(f"⚠️ Pre-load warning: {e}")
+
 @app.get("/")
 def home():
     return {"status": "AI Service is running", "model": "ArcFace (512D)"}
+
 
 @app.get("/health")
 def health():

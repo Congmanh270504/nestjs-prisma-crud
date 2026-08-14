@@ -43,7 +43,10 @@ export class FaceService {
       const response = await axios.post(
         `${this.aiServiceUrl}/extract-embedding`,
         formData,
-        { headers: formData.getHeaders() },
+        {
+          headers: formData.getHeaders(),
+          timeout: 90000, // 90 seconds timeout for AI model processing
+        },
       );
       return response.data.embedding as number[];
     } catch (err: any) {
