@@ -20,7 +20,7 @@ async function bootstrap() {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
     const port = process.env.PORT || 3002;
-    await app.listen(port);
-    console.log(`🚀 NestJS server is running on: http://localhost:${port}`);
+    await app.listen(port, '0.0.0.0');
+    console.log(`🚀 NestJS server is running on: http://0.0.0.0:${port}`);
 }
 bootstrap();
