@@ -20,7 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "generate": "npx prisma generate --schema=./prisma/schema.prisma",
     "migrate": "npx prisma migrate dev --schema=./prisma/schema.prisma --name add --preview-feature --create-only",
-    "deploy": "npx prisma migrate deploy --schema=./prisma/schema.prisma --preview-feature"
+    "deploy": "npx prisma migrate deploy --schema=./prisma/schema.prisma --preview-feature",
+    "client:dev": "pnpm --filter big-calendar dev",
+    "client:build": "pnpm --filter big-calendar build",
+    "client:start": "pnpm --filter big-calendar start"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -30,6 +33,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@prisma/client": "^5.22.0",
     "@types/multer": "^2.2.0",
+    "@upstash/qstash": "^2.12.1",
     "axios": "^1.19.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

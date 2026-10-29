@@ -1,19 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
-import { BookModule } from './book/book.module';
-import { AuthorModule } from './author/author.module';
-import { CategoryModule } from './category/category.module';
-import { FaceModule } from './face/face.module';
+import { UsersModule } from './users/users.module';
+import { ProjectsModule } from './projects/projects.module';
+import { EventsModule } from './events/events.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
-    BookModule,
-    AuthorModule,
-    CategoryModule,
-    FaceModule,
+    UsersModule,
+    ProjectsModule,
+    EventsModule,
+    RemindersModule,
   ],
   controllers: [],
   providers: [],

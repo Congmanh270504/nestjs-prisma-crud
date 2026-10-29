@@ -1,4 +1,9 @@
+packages:
+  - '.'
+  - 'client'
+
 onlyBuiltDependencies:
   - '@nestjs/core'
   - '@prisma/engines'
   - prisma
+

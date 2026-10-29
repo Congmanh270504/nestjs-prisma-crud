@@ -13,29 +13,112 @@ datasource db {
   extensions = [pgvector(map: "vector")]
 }
 
-model Book {
-  id          Int     @id @default(autoincrement())
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ReminderChannel {
+  EMAIL
+  IN_APP
+  WEBHOOK
+}
+
+enum ReminderStatus {
+  SCHEDULED
+  SENT
+  CANCELLED
+  FAILED
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  name          String
+  avatar        String?
+  role          Role        @default(MEMBER)
+  
+  projects      Project[]
+  createdTasks  TaskEvent[] @relation("CreatedTasks")
+  assignedTasks TaskEvent[] @relation("AssignedTasks")
+
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Project {
+  id          String      @id @default(uuid())
+  name        String
+  color       String      @default("blue")
+  description String?
+  
+  ownerId     String      @map("owner_id")
+  owner       User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  tasks       TaskEvent[]
+
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@map("projects")
+}
+
+model TaskEvent {
+  id          String       @id @default(uuid())
   title       String
   description String?
+  startDate   DateTime     @map("start_date")
+  endDate     DateTime     @map("end_date")
+  color       String       @default("blue")
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+
+  projectId   String?      @map("project_id")
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  creatorId   String       @map("creator_id")
+  creator     User         @relation("CreatedTasks", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  assigneeId  String?      @map("assignee_id")
+  assignee    User?        @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  reminders   Reminder[]
+
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@index([startDate, endDate])
+  @@map("task_events")
 }
 
-// -----------------------------------------------
-// FACE RECOGNITION MODELS
-// -----------------------------------------------
+model Reminder {
+  id          String          @id @default(uuid())
+  taskEventId String          @map("task_event_id")
+  taskEvent   TaskEvent       @relation(fields: [taskEventId], references: [id], onDelete: Cascade)
+  
+  remindAt    DateTime        @map("remind_at")
+  channel     ReminderChannel @default(WEBHOOK)
+  messageId   String?         @map("message_id")
+  status      ReminderStatus  @default(SCHEDULED)
 
-/// Lưu thông tin người dùng kèm vector đặc trưng khuôn mặt (512 chiều - ArcFace)
-model FaceUser {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  avatarUrl String?  @map("avatar_url")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
-  /// Vector embedding 512 chiều từ DeepFace ArcFace model
-  /// Dùng kiểu Unsupported vì Prisma chưa có native vector type
-  embedding Unsupported("vector(512)")?
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("face_users")
+  @@map("reminders")
 }
-
