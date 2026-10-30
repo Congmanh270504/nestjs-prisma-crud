@@ -21,7 +21,7 @@ export type TWorkingHours = { [key: number]: { from: number; to: number } };
 export type TVisibleHours = { from: number; to: number };
 
 export type IEvent = {
-  id: number;
+  id: string | number;
   startDate: string;
   endDate: string;
   title: string;
