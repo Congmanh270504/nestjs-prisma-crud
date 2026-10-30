@@ -1,9 +1,22 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+    const logger = new Logger('HTTP');
+
+    // HTTP Request Logger: Ghi log mọi request (GET, POST, PUT, DELETE) lên terminal / MS HOST
+    app.use((req: any, res: any, next: any) => {
+        const { method, originalUrl } = req;
+        const start = Date.now();
+        res.on('finish', () => {
+            const { statusCode } = res;
+            const duration = Date.now() - start;
+            logger.log(`${method} ${originalUrl} ${statusCode} +${duration}ms`);
+        });
+        next();
+    });
 
     // CORS: Cho phép NextJS / React frontend gọi API
     app.enableCors({
