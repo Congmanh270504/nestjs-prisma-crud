@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 interface ToggleTabItem {
   label: React.ReactNode;
   value: string;
+  ariaLabel?: string;
+  title?: string;
 }
 
 interface ToggleTabsProps {
@@ -47,6 +49,12 @@ export function ToggleTabs({ items, value, onChange, className, fullWidth }: Tog
     return () => observer.disconnect();
   }, [updateActiveIndicator]);
 
+  const handleMouseEnter = (idx: number) => {
+    setHoverIdx(idx);
+    const el = tabRefs.current[idx];
+    if (el) setHoverStyle({ left: el.offsetLeft, width: el.offsetWidth });
+  };
+
   return (
     <div
       ref={containerRef}
@@ -54,7 +62,7 @@ export function ToggleTabs({ items, value, onChange, className, fullWidth }: Tog
     >
       {/* Hover highlight */}
       <div
-        className="bg-foreground/6 pointer-events-none absolute top-0.5 h-[calc(100%-4px)] rounded-md transition-all duration-300 ease-out"
+        className="pointer-events-none absolute top-0.5 h-[calc(100%-4px)] rounded-md bg-foreground/10 shadow-sm transition-all duration-300 ease-out dark:bg-foreground/15"
         style={{ ...hoverStyle, opacity: hoverIdx !== null ? 1 : 0 }}
       />
       {/* Active underline */}
@@ -62,6 +70,9 @@ export function ToggleTabs({ items, value, onChange, className, fullWidth }: Tog
       {items.map((item, idx) => (
         <button
           key={item.value}
+          type="button"
+          aria-label={item.ariaLabel}
+          title={item.title}
           ref={el => {
             tabRefs.current[idx] = el;
           }}
@@ -71,7 +82,7 @@ export function ToggleTabs({ items, value, onChange, className, fullWidth }: Tog
             value === item.value ? "font-semibold text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:text-foreground"
           )}
           onClick={() => onChange(item.value)}
-          onMouseEnter={() => setHoverIdx(idx)}
+          onMouseEnter={() => handleMouseEnter(idx)}
           onMouseLeave={() => setHoverIdx(null)}
         >
           {item.label}

@@ -1,7 +1,10 @@
-import Link from "next/link";
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Columns, Grid3x3, List, Plus, Grid2x2, CalendarRange } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ToggleTabs } from "@/components/ui/toggle-tabs";
 
 import { UserSelect } from "@/calendar/components/header/user-select";
 import { TodayButton } from "@/calendar/components/header/today-button";
@@ -16,7 +19,42 @@ interface IProps {
   events: IEvent[];
 }
 
+const VIEW_TABS = [
+  {
+    value: "day",
+    label: <List className="size-4" strokeWidth={1.8} />,
+    title: "View by day",
+    ariaLabel: "View by day",
+  },
+  {
+    value: "week",
+    label: <Columns className="size-4" strokeWidth={1.8} />,
+    title: "View by week",
+    ariaLabel: "View by week",
+  },
+  {
+    value: "month",
+    label: <Grid2x2 className="size-4" strokeWidth={1.8} />,
+    title: "View by month",
+    ariaLabel: "View by month",
+  },
+  {
+    value: "year",
+    label: <Grid3x3 className="size-4" strokeWidth={1.8} />,
+    title: "View by year",
+    ariaLabel: "View by year",
+  },
+  {
+    value: "agenda",
+    label: <CalendarRange className="size-4" strokeWidth={1.8} />,
+    title: "View by agenda",
+    ariaLabel: "View by agenda",
+  },
+];
+
 export function CalendarHeader({ view, events }: IProps) {
+  const router = useRouter();
+
   return (
     <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-center gap-3">
@@ -26,62 +64,7 @@ export function CalendarHeader({ view, events }: IProps) {
 
       <div className="flex flex-col items-center gap-1.5 sm:flex-row sm:justify-between">
         <div className="flex w-full items-center gap-1.5">
-          <div className="inline-flex first:rounded-r-none last:rounded-l-none [&:not(:first-child):not(:last-child)]:rounded-none">
-            <Button asChild aria-label="View by day" size="icon" variant={view === "day" ? "default" : "outline"} className="rounded-r-none [&_svg]:size-5">
-              <Link href="/day-view">
-                <List strokeWidth={1.8} />
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              aria-label="View by week"
-              size="icon"
-              variant={view === "week" ? "default" : "outline"}
-              className="-ml-px rounded-none [&_svg]:size-5"
-            >
-              <Link href="/week-view">
-                <Columns strokeWidth={1.8} />
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              aria-label="View by month"
-              size="icon"
-              variant={view === "month" ? "default" : "outline"}
-              className="-ml-px rounded-none [&_svg]:size-5"
-            >
-              <Link href="/month-view">
-                <Grid2x2 strokeWidth={1.8} />
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              aria-label="View by year"
-              size="icon"
-              variant={view === "year" ? "default" : "outline"}
-              className="-ml-px rounded-none [&_svg]:size-5"
-            >
-              <Link href="/year-view">
-                <Grid3x3 strokeWidth={1.8} />
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              aria-label="View by agenda"
-              size="icon"
-              variant={view === "agenda" ? "default" : "outline"}
-              className="-ml-px rounded-l-none [&_svg]:size-5"
-            >
-              <Link href="/agenda-view">
-                <CalendarRange strokeWidth={1.8} />
-              </Link>
-            </Button>
-          </div>
-
+          <ToggleTabs items={VIEW_TABS} value={view} onChange={val => router.push(`/${val}-view`)} className="h-9" />
           <UserSelect />
         </div>
 

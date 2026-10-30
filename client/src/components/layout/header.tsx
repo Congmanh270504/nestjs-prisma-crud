@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowUpRight, Calendar } from "lucide-react";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 import { ToggleTheme } from "@/components/layout/change-theme";
 import CalendarSettings from "@/calendar/components/dialogs/calendar-settings";
@@ -43,6 +45,26 @@ export function Header() {
             <CalendarSettings />
 
             <ToggleTheme />
+
+            <Suspense fallback={null}>
+              <Show when="signed-out">
+                <div className="flex items-center gap-2">
+                  <SignInButton mode="modal">
+                    <button className="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
+                      Sign In
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                      Sign Up
+                    </button>
+                  </SignUpButton>
+                </div>
+              </Show>
+              <Show when="signed-in">
+                <UserButton />
+              </Show>
+            </Suspense>
           </div>
         </div>
       </div>

@@ -20,11 +20,7 @@ async function bootstrap() {
 
     // CORS: Cho phép NextJS / React frontend gọi API
     app.enableCors({
-        origin: [
-            process.env.CORS_ORIGIN || 'http://localhost:3000',
-            'http://localhost:3000',
-            'http://localhost:5173',
-        ],
+        origin: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         credentials: true,
     });

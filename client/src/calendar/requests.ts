@@ -33,14 +33,57 @@ export const getUsers = async (): Promise<IUser[]> => {
     if (!Array.isArray(data) || data.length === 0) {
       return USERS_MOCK;
     }
-    return data.map((u: { id: string; name: string; avatar?: string | null }) => ({
+    return data.map((u: { id: string; clerkId?: string; name?: string; avatar?: string | null }) => ({
       id: u.id,
-      name: u.name,
+      clerkId: u.clerkId,
+      name: u.name || u.clerkId || "User",
       picturePath: u.avatar ?? null,
     }));
   } catch {
     return USERS_MOCK;
   }
+};
+
+export const getRecentUsers = async (limit = 20): Promise<IUser[]> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users?limit=${limit}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return USERS_MOCK;
+    }
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      return USERS_MOCK;
+    }
+    return data.map((u: { id: string; clerkId?: string; name?: string; avatar?: string | null }) => ({
+      id: u.id,
+      clerkId: u.clerkId,
+      name: u.name || u.clerkId || "User",
+      picturePath: u.avatar ?? null,
+    }));
+  } catch {
+    return USERS_MOCK;
+  }
+};
+
+export const createInvitationApi = async (invitationData: {
+  code?: string;
+  groupId?: string;
+  userSentId?: string;
+  userReceivedId?: string;
+  des?: string;
+}) => {
+  const res = await fetch(`${API_BASE_URL}/invitations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(invitationData),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to create invitation");
+  }
+  return res.json();
 };
 
 export const createEventApi = async (eventData: {
@@ -84,4 +127,22 @@ export const deleteEventApi = async (id: string | number) => {
   });
   if (!res.ok) throw new Error("Failed to delete event");
   return res.json();
+};
+
+export const syncUserApi = async (clerkId: string) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clerkId }),
+    });
+    if (!res.ok) {
+      console.warn("Failed to sync user to backend db:", res.statusText);
+      return null;
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn("Error syncing user to backend db:", err);
+    return null;
+  }
 };

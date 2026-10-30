@@ -40,7 +40,7 @@ export class ProjectsService implements OnModuleInit {
   async findAll() {
     return this.prisma.project.findMany({
       include: {
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, clerkId: true } },
         _count: { select: { tasks: true } },
       },
       orderBy: { createdAt: 'desc' },

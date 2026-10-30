@@ -26,8 +26,8 @@ export function ToggleTheme() {
 
   return (
     <Button variant="ghost" size="icon" onClick={toggleTheme}>
-      {currentTheme === "light" && <Sun />}
-      {currentTheme === "dark" && <Moon />}
+      {currentTheme === "light" && <Sun className="text-yellow-800" />}
+      {currentTheme === "dark" && <Moon className="text-yellow-500" />}
     </Button>
   );
 }

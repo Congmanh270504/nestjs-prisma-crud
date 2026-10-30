@@ -2,8 +2,9 @@ import type { TEventColor } from "@/calendar/types";
 
 export interface IUser {
   id: string;
+  clerkId?: string;
   name: string;
-  picturePath: string | null;
+  picturePath?: string | null;
 }
 
 export interface IReminder {

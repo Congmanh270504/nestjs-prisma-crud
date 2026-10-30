@@ -46,16 +46,65 @@ enum ReminderStatus {
   FAILED
 }
 
+model Groups {
+  id        String    @id @default(uuid())
+  name      String
+  des       String?
+  color     String? @default("gray")
+
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  invitations     Invitations[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("groups")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model Invitations {
+  id          String   @id @default(uuid())
+  code        String   @unique
+
+  groupId     String
+  group       Groups   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  userSentId  String?
+  userSent    User?    @relation("SentInvitations", fields: [userSentId], references: [id], onDelete: Cascade)
+
+  userReceivedId  String?
+  userReceived    User?    @relation("ReceivedInvitations", fields: [userReceivedId], references: [id], onDelete: Cascade)
+
+  status      InvitationStatus @default(PENDING)
+
+  des String?
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("invitations")
+}
+
 model User {
   id            String      @id @default(uuid())
-  email         String      @unique
-  name          String
-  avatar        String?
+  clerkId       String?     @unique @map("clerk_id")
   role          Role        @default(MEMBER)
   
+  groups        Groups[]
   projects      Project[]
   createdTasks  TaskEvent[] @relation("CreatedTasks")
   assignedTasks TaskEvent[] @relation("AssignedTasks")
+
+  sentInvitations     Invitations[] @relation("SentInvitations")
+  receivedInvitations Invitations[] @relation("ReceivedInvitations")
 
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")

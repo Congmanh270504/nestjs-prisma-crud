@@ -13,9 +13,9 @@ export function CalendarSettings() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-fit gap-2">
+        <Button variant="ghost" className="w-full justify-start gap-2 text-left">
           <Settings className="size-4" />
-          <span>Calendar settings</span>
+          <span>Settings</span>
         </Button>
       </DialogTrigger>
 
@@ -28,7 +28,7 @@ export function CalendarSettings() {
           <DialogDescription>Configure badge variant, visible hours range, and your weekly working schedule.</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[70vh] ">
+        <ScrollArea className="max-h-[70vh]">
           <div className="flex flex-col gap-6 py-2">
             <ChangeBadgeVariantInput />
             <div className="border-t pt-4">

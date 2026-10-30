@@ -102,8 +102,8 @@ export class EventsService implements OnModuleInit {
     const tasks = await this.prisma.taskEvent.findMany({
       where,
       include: {
-        creator: { select: { id: true, name: true, avatar: true } },
-        assignee: { select: { id: true, name: true, avatar: true } },
+        creator: { select: { id: true, clerkId: true } },
+        assignee: { select: { id: true, clerkId: true } },
         project: { select: { id: true, name: true, color: true } },
         reminders: true,
       },
@@ -122,8 +122,7 @@ export class EventsService implements OnModuleInit {
       priority: task.priority,
       user: {
         id: task.creator.id,
-        name: task.creator.name,
-        picturePath: task.creator.avatar,
+        clerkId: task.creator.clerkId,
       },
       project: task.project,
       reminders: task.reminders,
@@ -156,8 +155,7 @@ export class EventsService implements OnModuleInit {
       priority: task.priority,
       user: {
         id: task.creator.id,
-        name: task.creator.name,
-        picturePath: task.creator.avatar,
+        clerkId: task.creator.clerkId,
       },
       project: task.project,
       reminders: task.reminders,
@@ -186,7 +184,7 @@ export class EventsService implements OnModuleInit {
         priority: dto.priority || 'MEDIUM',
       },
       include: {
-        creator: { select: { id: true, name: true, avatar: true } },
+        creator: { select: { id: true, clerkId: true } },
         project: true,
       },
     });
@@ -202,8 +200,7 @@ export class EventsService implements OnModuleInit {
       priority: task.priority,
       user: {
         id: task.creator.id,
-        name: task.creator.name,
-        picturePath: task.creator.avatar,
+        clerkId: task.creator.clerkId,
       },
       project: task.project,
     };
@@ -225,7 +222,7 @@ export class EventsService implements OnModuleInit {
       where: { id },
       data,
       include: {
-        creator: { select: { id: true, name: true, avatar: true } },
+        creator: { select: { id: true, clerkId: true } },
         project: true,
       },
     });
@@ -241,8 +238,7 @@ export class EventsService implements OnModuleInit {
       priority: task.priority,
       user: {
         id: task.creator.id,
-        name: task.creator.name,
-        picturePath: task.creator.avatar,
+        clerkId: task.creator.clerkId,
       },
       project: task.project,
     };
