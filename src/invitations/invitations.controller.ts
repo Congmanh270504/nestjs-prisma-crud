@@ -1,23 +1,28 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
 import { InvitationsService } from './invitations.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 @Controller('invitations')
 export class InvitationsController {
-  constructor(private readonly invitationsService: InvitationsService) {}
+    constructor(private readonly invitationsService: InvitationsService) {}
 
-  @Post()
-  create(@Body() dto: CreateInvitationDto) {
-    return this.invitationsService.create(dto);
-  }
+    @Post()
+    create(@Body() dto: CreateInvitationDto) {
+        return this.invitationsService.create(dto);
+    }
 
-  @Get()
-  findAll() {
-    return this.invitationsService.findAll();
-  }
+    @Get()
+    findAll() {
+        return this.invitationsService.findAll();
+    }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.invitationsService.findOne(id);
-  }
+    @Get(':id')
+    findOne(@Param('id') id: string) {
+        return this.invitationsService.findOne(id);
+    }
+
+    @Delete(':id')
+    delete(@Param('id') id: string) {
+        return this.invitationsService.delete(id);
+    }
 }

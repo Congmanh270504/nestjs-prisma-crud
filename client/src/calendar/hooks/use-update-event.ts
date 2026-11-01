@@ -4,7 +4,7 @@ import { updateEventApi } from "@/calendar/requests";
 import type { IEvent } from "@/calendar/interfaces";
 
 export function useUpdateEvent() {
-  const { setLocalEvents } = useCalendar();
+  const { setLocalEvents, isMockMode } = useCalendar();
 
   const updateEvent = (event: IEvent) => {
     const newEvent: IEvent = { ...event };
@@ -18,8 +18,10 @@ export function useUpdateEvent() {
       return [...prev.slice(0, index), newEvent, ...prev.slice(index + 1)];
     });
 
-    // Call backend API in background
-    updateEventApi(newEvent.id, newEvent).catch(() => {});
+    // Call backend API in background only when not in mock mode
+    if (!isMockMode) {
+      updateEventApi(newEvent.id, newEvent).catch(() => {});
+    }
   };
 
   return { updateEvent };

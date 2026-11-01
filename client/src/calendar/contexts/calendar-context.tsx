@@ -1,6 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { CALENDAR_ITEMS_MOCK, USERS_MOCK } from "@/calendar/mocks";
+import { getEvents, getUsers } from "@/calendar/requests";
 
 import type { Dispatch, SetStateAction } from "react";
 import type { IEvent, IUser } from "@/calendar/interfaces";
@@ -20,6 +23,7 @@ interface ICalendarContext {
   setVisibleHours: Dispatch<SetStateAction<TVisibleHours>>;
   events: IEvent[];
   setLocalEvents: Dispatch<SetStateAction<IEvent[]>>;
+  isMockMode: boolean;
 }
 
 export const WORKING_HOURS: TWorkingHours = {
@@ -41,16 +45,27 @@ const CalendarContext = createContext<ICalendarContext>({
   setSelectedUserId: () => {},
   badgeVariant: "colored",
   setBadgeVariant: () => {},
-  users: [],
+  users: USERS_MOCK,
   workingHours: WORKING_HOURS,
   setWorkingHours: () => {},
   visibleHours: VISIBLE_HOURS,
   setVisibleHours: () => {},
-  events: [],
+  events: CALENDAR_ITEMS_MOCK,
   setLocalEvents: () => {},
+  isMockMode: true,
 });
 
-export function CalendarProvider({ children, users, events }: { children: React.ReactNode; users: IUser[]; events: IEvent[] }) {
+export function CalendarProvider({
+  children,
+  users: initialUsers,
+  events: initialEvents,
+}: {
+  children: React.ReactNode;
+  users: IUser[];
+  events: IEvent[];
+}) {
+  const { isSignedIn, isLoaded } = useUser();
+
   const [badgeVariant, setBadgeVariant] = useState<TBadgeVariant>("colored");
   const [visibleHours, setVisibleHours] = useState<TVisibleHours>(VISIBLE_HOURS);
   const [workingHours, setWorkingHours] = useState<TWorkingHours>(WORKING_HOURS);
@@ -58,16 +73,44 @@ export function CalendarProvider({ children, users, events }: { children: React.
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedUserId, setSelectedUserId] = useState<IUser["id"] | "all">("all");
 
-  // This localEvents doesn't need to exists in a real scenario.
-  // It's used here just to simulate the update of the events.
-  // In a real scenario, the events would be updated in the backend
-  // and the request that fetches the events should be refetched
-  const [localEvents, setLocalEvents] = useState<IEvent[]>(events);
+  const [backendUsers, setBackendUsers] = useState<IUser[]>(initialUsers);
+  // Default to CALENDAR_ITEMS_MOCK so unauthenticated visitors see mock data right away
+  const [localEvents, setLocalEvents] = useState<IEvent[]>(CALENDAR_ITEMS_MOCK);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (isSignedIn) {
+      // User is logged in: use real backend data
+      if (initialEvents && initialEvents.length > 0) {
+        setLocalEvents(initialEvents);
+      }
+      getEvents().then((fetchedEvents) => {
+        setLocalEvents(fetchedEvents);
+      });
+      getUsers().then((fetchedUsers) => {
+        setBackendUsers(fetchedUsers);
+      });
+    } else {
+      // User is not logged in: use mock data from mocks.ts
+      setLocalEvents(CALENDAR_ITEMS_MOCK);
+      setSelectedUserId("all");
+    }
+  }, [isSignedIn, isLoaded, initialEvents]);
 
   const handleSelectDate = (date: Date | undefined) => {
     if (!date) return;
     setSelectedDate(date);
   };
+
+  const isMockMode = !isLoaded || !isSignedIn;
+
+  const activeUsers = useMemo(() => {
+    if (isMockMode) {
+      return USERS_MOCK;
+    }
+    return backendUsers && backendUsers.length > 0 ? backendUsers : initialUsers;
+  }, [isMockMode, backendUsers, initialUsers]);
 
   return (
     <CalendarContext.Provider
@@ -78,14 +121,14 @@ export function CalendarProvider({ children, users, events }: { children: React.
         setSelectedUserId,
         badgeVariant,
         setBadgeVariant,
-        users,
+        users: activeUsers,
         visibleHours,
         setVisibleHours,
         workingHours,
         setWorkingHours,
-        // If you go to the refetch approach, you can remove the localEvents and pass the events directly
         events: localEvents,
         setLocalEvents,
+        isMockMode,
       }}
     >
       {children}

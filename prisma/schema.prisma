@@ -49,7 +49,6 @@ enum ReminderStatus {
 model Groups {
   id        String    @id @default(uuid())
   name      String
-  des       String?
   color     String? @default("gray")
 
   ownerId   String

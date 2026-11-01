@@ -33,7 +33,7 @@ interface IProps {
 }
 
 export function AddEventDialog({ children, startDate, startTime }: IProps) {
-  const { users, setLocalEvents } = useCalendar();
+  const { users, setLocalEvents, isMockMode } = useCalendar();
 
   const { isOpen, onClose, onToggle } = useDisclosure();
 
@@ -72,20 +72,22 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
     onClose();
     form.reset();
 
-    try {
-      const created = await createEventApi({
-        title: values.title,
-        description: values.description,
-        startDate: startDateTime.toISOString(),
-        endDate: endDateTime.toISOString(),
-        color: values.color,
-        userId: user.id,
-      });
-      if (created?.id) {
-        setLocalEvents(prev => prev.map(e => (e.id === tempId ? { ...e, id: created.id } : e)));
+    if (!isMockMode) {
+      try {
+        const created = await createEventApi({
+          title: values.title,
+          description: values.description,
+          startDate: startDateTime.toISOString(),
+          endDate: endDateTime.toISOString(),
+          color: values.color,
+          userId: user.id,
+        });
+        if (created?.id) {
+          setLocalEvents(prev => prev.map(e => (e.id === tempId ? { ...e, id: created.id } : e)));
+        }
+      } catch {
+        // Handle or ignore offline sync error
       }
-    } catch {
-      // Handle or ignore offline sync error
     }
   };
 

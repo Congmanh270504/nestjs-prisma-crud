@@ -6,6 +6,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { EventsModule } from './events/events.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { InvitationsModule } from './invitations/invitations.module';
+import { GroupsModule } from './groups/groups.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { InvitationsModule } from './invitations/invitations.module';
     EventsModule,
     RemindersModule,
     InvitationsModule,
+    GroupsModule,
   ],
   controllers: [],
   providers: [],

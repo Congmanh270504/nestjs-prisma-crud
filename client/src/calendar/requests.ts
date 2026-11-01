@@ -1,4 +1,3 @@
-import { CALENDAR_ITEMS_MOCK, USERS_MOCK } from "@/calendar/mocks";
 import type { IEvent, IUser } from "@/calendar/interfaces";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
@@ -9,15 +8,15 @@ export const getEvents = async (): Promise<IEvent[]> => {
       cache: "no-store",
     });
     if (!res.ok) {
-      return CALENDAR_ITEMS_MOCK;
+      return [];
     }
     const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) {
-      return CALENDAR_ITEMS_MOCK;
+    if (!Array.isArray(data)) {
+      return [];
     }
     return data;
   } catch {
-    return CALENDAR_ITEMS_MOCK;
+    return [];
   }
 };
 
@@ -27,11 +26,11 @@ export const getUsers = async (): Promise<IUser[]> => {
       cache: "no-store",
     });
     if (!res.ok) {
-      return USERS_MOCK;
+      return [];
     }
     const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) {
-      return USERS_MOCK;
+    if (!Array.isArray(data)) {
+      return [];
     }
     return data.map((u: { id: string; clerkId?: string; name?: string; avatar?: string | null }) => ({
       id: u.id,
@@ -40,40 +39,77 @@ export const getUsers = async (): Promise<IUser[]> => {
       picturePath: u.avatar ?? null,
     }));
   } catch {
-    return USERS_MOCK;
+    return [];
   }
 };
 
-export const getRecentUsers = async (limit = 20): Promise<IUser[]> => {
+export interface IDbUser {
+  id: string;
+  clerkId?: string | null;
+  role?: string;
+  createdAt?: string;
+}
+
+export interface IClerkUser {
+  id: string;
+  userName: string | null;
+  imageUrl?: string | null;
+}
+
+export const getRecentUsers = async (limit = 20): Promise<IClerkUser[]> => {
   try {
     const res = await fetch(`${API_BASE_URL}/users?limit=${limit}`, {
       cache: "no-store",
     });
     if (!res.ok) {
-      return USERS_MOCK;
+      return [];
     }
+
     const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) {
-      return USERS_MOCK;
+    if (!Array.isArray(data)) {
+      return [];
     }
-    return data.map((u: { id: string; clerkId?: string; name?: string; avatar?: string | null }) => ({
-      id: u.id,
-      clerkId: u.clerkId,
-      name: u.name || u.clerkId || "User",
-      picturePath: u.avatar ?? null,
-    }));
-  } catch {
-    return USERS_MOCK;
+
+    const userIds = data.map((u: IDbUser) => u.clerkId).filter((id): id is string => Boolean(id && id.startsWith("user_")));
+
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const clerkRes = await fetch("/api/clerk-users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userIds }),
+    });
+
+    if (!clerkRes.ok) {
+      return [];
+    }
+
+    return await clerkRes.json();
+  } catch (error) {
+    console.error("Error fetching recent users from DB:", error);
+    return [];
   }
 };
 
-export const createInvitationApi = async (invitationData: {
-  code?: string;
-  groupId?: string;
-  userSentId?: string;
-  userReceivedId?: string;
-  des?: string;
-}) => {
+export const getClerkUsersApi = async (userIds: string[]): Promise<IClerkUser[]> => {
+  if (!userIds || userIds.length === 0) return [];
+  try {
+    const res = await fetch("/api/clerk-users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userIds }),
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (error) {
+    console.error("Error fetching Clerk users:", error);
+    return [];
+  }
+};
+
+export const createInvitationApi = async (invitationData: { code?: string; groupId?: string; userSentId?: string; userReceivedId?: string; des?: string }) => {
   const res = await fetch(`${API_BASE_URL}/invitations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -82,6 +118,17 @@ export const createInvitationApi = async (invitationData: {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || "Failed to create invitation");
+  }
+  return res.json();
+};
+
+export const deleteInvitationApi = async (id: string): Promise<{ success: boolean }> => {
+  const res = await fetch(`${API_BASE_URL}/invitations/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to delete invitation");
   }
   return res.json();
 };
@@ -146,3 +193,99 @@ export const syncUserApi = async (clerkId: string) => {
     return null;
   }
 };
+
+export interface IGroupInvitation {
+  id: string;
+  code: string;
+  groupId: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  des?: string | null;
+  userSentId?: string | null;
+  userReceivedId?: string | null;
+  userReceived?: {
+    id: string;
+    clerkId?: string | null;
+  } | null;
+  createdAt: string;
+}
+
+export interface IGroup {
+  id: string;
+  name: string;
+  color?: string | null;
+  ownerId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  invitations?: IGroupInvitation[];
+  _count?: {
+    invitations: number;
+  };
+  isNew?: boolean;
+}
+
+export const getGroupsApi = async (params?: { clerkId?: string; ownerId?: string }): Promise<IGroup[]> => {
+  try {
+    const query = new URLSearchParams();
+    if (params?.clerkId) query.set("clerkId", params.clerkId);
+    if (params?.ownerId) query.set("ownerId", params.ownerId);
+
+    const queryString = query.toString() ? `?${query.toString()}` : "";
+    const res = await fetch(`${API_BASE_URL}/groups${queryString}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching groups:", error);
+    return [];
+  }
+};
+
+export const createGroupApi = async (data: {
+  name: string;
+  color?: string;
+  clerkId?: string;
+  ownerId?: string;
+}): Promise<IGroup> => {
+  const res = await fetch(`${API_BASE_URL}/groups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to create group");
+  }
+  return res.json();
+};
+
+export const updateGroupApi = async (
+  id: string,
+  data: { name?: string; color?: string }
+): Promise<IGroup> => {
+  const res = await fetch(`${API_BASE_URL}/groups/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to update group");
+  }
+  return res.json();
+};
+
+export const deleteGroupApi = async (id: string): Promise<{ success: boolean }> => {
+  const res = await fetch(`${API_BASE_URL}/groups/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to delete group");
+  }
+  return res.json();
+};
+
