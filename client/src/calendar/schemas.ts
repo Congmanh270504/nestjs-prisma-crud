@@ -10,6 +10,9 @@ export const eventSchema = z
     endDate: z.date({ required_error: "End date is required" }),
     endTime: z.object({ hour: z.number(), minute: z.number() }, { required_error: "End time is required" }),
     color: z.enum(["blue", "green", "red", "yellow", "purple", "orange", "gray"], { required_error: "Color is required" }),
+    groupId: z.string().optional(),
+    status: z.enum(["TODO", "IN_PROGRESS", "DONE", "CANCELLED"]).optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
   })
   .refine(
     data => {

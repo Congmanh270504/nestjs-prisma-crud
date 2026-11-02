@@ -18,13 +18,13 @@ export function Header() {
           <div className="space-y-1">
             <p className="text-lg font-medium leading-6">Big calendar</p>
             <p className="text-sm text-foreground">
-              Built with Next.js and Tailwind by{" "}
+              Built with Next.js and NestJS by{" "}
               <Link
-                href="https://github.com/lramos33"
+                href="https://github.com/Congmanh270504/nestjs-prisma-crud"
                 target="_blank"
                 className="inline-flex gap-0.5 text-sm underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                lramos33
+                Cmanh
                 <ArrowUpRight size={12} className="text-foreground" />
               </Link>
             </p>
@@ -33,7 +33,7 @@ export function Header() {
 
         <div className="hidden items-center gap-4 md:flex">
           <Link
-            href="https://github.com/lramos33/big-calendar"
+            href="https://github.com/Congmanh270504/nestjs-prisma-crud"
             target="_blank"
             className="inline-flex gap-0.5 text-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >

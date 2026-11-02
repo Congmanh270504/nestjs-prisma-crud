@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Columns, Grid3x3, List, Plus, Grid2x2, CalendarRange } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ const VIEW_TABS = [
 
 export function CalendarHeader({ view, events }: IProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   return (
     <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -64,7 +65,15 @@ export function CalendarHeader({ view, events }: IProps) {
 
       <div className="flex flex-col items-center gap-1.5 sm:flex-row sm:justify-between">
         <div className="flex w-full items-center gap-1.5">
-          <ToggleTabs items={VIEW_TABS} value={view} onChange={val => router.push(`/${val}-view`)} className="h-9" />
+          <ToggleTabs
+            items={VIEW_TABS}
+            value={view}
+            onChange={val => {
+              const qs = searchParams.toString();
+              router.push(`/${val}-view${qs ? `?${qs}` : ""}`);
+            }}
+            className="h-9"
+          />
           <UserSelect />
         </div>
 

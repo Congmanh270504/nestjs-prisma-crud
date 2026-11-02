@@ -1,7 +1,24 @@
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+
 export class CreateInvitationDto {
-  code?: string;
-  groupId?: string;
-  userSentId?: string;
-  userReceivedId?: string;
-  des?: string;
+    @IsString()
+    @IsOptional()
+    code?: string;
+
+    @IsString()
+    @IsNotEmpty()
+    groupId: string;
+
+    @IsString()
+    @IsOptional()
+    userSentId?: string;
+
+    @IsString()
+    @IsOptional()
+    userReceivedId?: string;
+
+    @IsString()
+    @IsOptional()
+    des?: string;
 }
+

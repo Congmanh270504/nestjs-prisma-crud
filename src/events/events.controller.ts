@@ -12,9 +12,9 @@ export class EventsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('userId') userId?: string,
-    @Query('projectId') projectId?: string,
+    @Query('groupId') groupId?: string,
   ) {
-    return this.eventsService.findAll({ startDate, endDate, userId, projectId });
+    return this.eventsService.findAll({ startDate, endDate, userId, groupId });
   }
 
   @Get(':id')

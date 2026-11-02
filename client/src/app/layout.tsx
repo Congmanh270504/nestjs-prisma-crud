@@ -7,7 +7,7 @@ import { inter } from "@/styles/fonts";
 import { cn } from "@/lib/utils";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 import { CalendarProvider } from "@/calendar/contexts/calendar-context";
 import { getEvents, getUsers } from "@/calendar/requests";
@@ -30,6 +30,7 @@ export const metadata: Metadata = {
 
 import { ClerkSyncUser } from "@/components/auth/clerk-sync-user";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Suspense } from "react";
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const [events, users] = await Promise.all([getEvents(), getUsers()]);
@@ -40,18 +41,23 @@ export default async function Layout({ children }: { children: React.ReactNode }
       <body>
         <ClerkProvider>
           <ClerkSyncUser />
-          <CalendarProvider users={users} events={events}>
-            <SidebarProvider>
-              <AppSidebar />
-              <SidebarInset>
-                {/* <Header /> */}
-                <div className="">
-                  <Analytics />
-                  {children}
-                </div>
-              </SidebarInset>
-            </SidebarProvider>
-          </CalendarProvider>
+          <Suspense fallback={null}>
+            <CalendarProvider users={users} events={events}>
+              <SidebarProvider>
+                <AppSidebar />
+                <SidebarInset>
+                  {/* <Header /> */}
+                  <div className="">
+                    <Analytics />
+                    <div className="ml-14 md:hidden">
+                      <SidebarTrigger className="mx-1" />
+                    </div>
+                    {children}
+                  </div>
+                </SidebarInset>
+              </SidebarProvider>
+            </CalendarProvider>
+          </Suspense>
         </ClerkProvider>
       </body>
     </html>

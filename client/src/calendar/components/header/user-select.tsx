@@ -19,8 +19,8 @@ export function UserSelect() {
             <AvatarGroup max={2}>
               {users.map(user => (
                 <Avatar key={user.id} className="size-6 text-xxs">
-                  <AvatarImage src={user.picturePath ?? undefined} alt={user.name} />
-                  <AvatarFallback className="text-xxs">{user.name[0]}</AvatarFallback>
+                  <AvatarImage src={user.picturePath ?? undefined} alt={user.name || "User"} />
+                  <AvatarFallback className="text-xxs">{user.name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
               ))}
             </AvatarGroup>
@@ -32,11 +32,11 @@ export function UserSelect() {
           <SelectItem key={user.id} value={user.id} className="flex-1">
             <div className="flex items-center gap-2">
               <Avatar key={user.id} className="size-6">
-                <AvatarImage src={user.picturePath ?? undefined} alt={user.name} />
-                <AvatarFallback className="text-xxs">{user.name[0]}</AvatarFallback>
+                <AvatarImage src={user.picturePath ?? undefined} alt={user.name || "User"} />
+                <AvatarFallback className="text-xxs">{user.name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
               </Avatar>
 
-              <p className="truncate">{user.name}</p>
+              <p className="truncate">{user.name || "User"}</p>
             </div>
           </SelectItem>
         ))}

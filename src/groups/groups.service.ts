@@ -4,29 +4,47 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { PusherService } from '../pusher/pusher.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { generateRandomCode } from '../helper';
 
 @Injectable()
 export class GroupsService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private pusher: PusherService,
+    ) {}
 
     async findAll(filter?: { ownerId?: string; clerkId?: string }) {
-        let ownerId = filter?.ownerId;
+        let where: any = undefined;
 
-        if (!ownerId && filter?.clerkId) {
+        if (filter?.ownerId) {
+            where = { ownerId: filter.ownerId };
+        } else if (filter?.clerkId) {
             const user = await this.prisma.user.findUnique({
                 where: { clerkId: filter.clerkId },
             });
             if (!user) {
                 return [];
             }
-            ownerId = user.id;
+            where = {
+                OR: [
+                    { ownerId: user.id },
+                    {
+                        invitations: {
+                            some: {
+                                userReceivedId: user.id,
+                                status: 'ACCEPTED',
+                            },
+                        },
+                    },
+                ],
+            };
         }
 
         return this.prisma.groups.findMany({
-            where: ownerId ? { ownerId } : undefined,
+            where,
             orderBy: { createdAt: 'desc' },
             include: {
                 invitations: {
@@ -38,7 +56,7 @@ export class GroupsService {
                             },
                         },
                     },
-                    orderBy: { createdAt: 'desc' },
+                    orderBy: { createdAt: 'asc' },
                 },
                 _count: {
                     select: {
@@ -87,7 +105,7 @@ export class GroupsService {
             );
         }
 
-        return this.prisma.groups.create({
+        const newGroup = await this.prisma.groups.create({
             data: {
                 name: dto.name,
                 color: dto.color || 'gray',
@@ -107,6 +125,10 @@ export class GroupsService {
                 },
             },
         });
+
+        await this.pusher.trigger('groups-channel', 'group-created', newGroup);
+
+        return newGroup;
     }
 
     async update(id: string, dto: UpdateGroupDto) {
@@ -115,7 +137,7 @@ export class GroupsService {
             throw new NotFoundException(`Group with ID ${id} not found`);
         }
 
-        return this.prisma.groups.update({
+        const updated = await this.prisma.groups.update({
             where: { id },
             data: {
                 name: dto.name,
@@ -127,6 +149,10 @@ export class GroupsService {
                 },
             },
         });
+
+        await this.pusher.trigger('groups-channel', 'group-updated', updated);
+
+        return updated;
     }
 
     async remove(id: string) {
@@ -135,8 +161,12 @@ export class GroupsService {
             throw new NotFoundException(`Group with ID ${id} not found`);
         }
 
-        return this.prisma.groups.delete({
+        const deleted = await this.prisma.groups.delete({
             where: { id },
         });
+
+        await this.pusher.trigger('groups-channel', 'group-deleted', deleted);
+
+        return deleted;
     }
 }

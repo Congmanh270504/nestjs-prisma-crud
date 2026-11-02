@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Plus, Users, Loader2, Mail, Clock, Trash2, UserPlus } from "lucide-react";
+import { ChevronRight, Plus, Users, Loader2, Mail, Clock, Trash2, UserPlus, Crown } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -17,11 +17,13 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ManageGroupsDialog from "@/calendar/components/dialogs/manage-groups-dialog";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "./ui/button";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { getGroupsApi, getClerkUsersApi, deleteInvitationApi, type IGroup, type IClerkUser, type IGroupInvitation } from "@/calendar/requests";
 import { cn } from "@/lib/utils";
 import AddInvitationDialog from "@/calendar/components/dialogs/add-invitation-dialog";
+import { getPusherClient } from "@/lib/pusher";
 
 const COLOR_MAP: Record<string, string> = {
   blue: "bg-blue-500",
@@ -33,21 +35,55 @@ const COLOR_MAP: Record<string, string> = {
   gray: "bg-slate-400",
 };
 
-export function NavMain({
-  items,
-}: {
-  items?: {
-    title: string;
-    url: string;
-    icon?: any;
-    isActive?: boolean;
-    items?: {
-      title: string;
-      url: string;
-    }[];
-  }[];
-}) {
+const GROUP_THEME_MAP: Record<
+  string,
+  {
+    itemActive: string;
+    buttonActive: string;
+  }
+> = {
+  blue: {
+    itemActive: "bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 shadow-sm",
+    buttonActive: "bg-blue-100/90 text-blue-950 dark:bg-blue-900/60 dark:text-blue-100 font-semibold",
+  },
+  green: {
+    itemActive: "bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 shadow-sm",
+    buttonActive: "bg-emerald-100/90 text-emerald-950 dark:bg-emerald-900/60 dark:text-emerald-100 font-semibold",
+  },
+  red: {
+    itemActive: "bg-rose-50/80 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60 shadow-sm",
+    buttonActive: "bg-rose-100/90 text-rose-950 dark:bg-rose-900/60 dark:text-rose-100 font-semibold",
+  },
+  yellow: {
+    itemActive: "bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 shadow-sm",
+    buttonActive: "bg-amber-100/90 text-amber-950 dark:bg-amber-900/60 dark:text-amber-100 font-semibold",
+  },
+  gold: {
+    itemActive: "bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 shadow-sm",
+    buttonActive: "bg-amber-100/90 text-amber-950 dark:bg-amber-900/60 dark:text-amber-100 font-semibold",
+  },
+  purple: {
+    itemActive: "bg-purple-50/80 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/60 shadow-sm",
+    buttonActive: "bg-purple-100/90 text-purple-950 dark:bg-purple-900/60 dark:text-purple-100 font-semibold",
+  },
+  orange: {
+    itemActive: "bg-orange-50/80 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800/60 shadow-sm",
+    buttonActive: "bg-orange-100/90 text-orange-950 dark:bg-orange-900/60 dark:text-orange-100 font-semibold",
+  },
+  gray: {
+    itemActive: "bg-slate-100 dark:bg-slate-850/60 border-slate-300 dark:border-slate-700 shadow-sm",
+    buttonActive: "bg-slate-200 text-slate-950 dark:bg-slate-700 dark:text-slate-100 font-semibold",
+  },
+};
+
+export function NavMain() {
   const { user, isSignedIn, isLoaded } = useUser();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const selectedGroupId = searchParams.get("groupId");
+
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
   const [groups, setGroups] = React.useState<IGroup[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [clerkUsersMap, setClerkUsersMap] = React.useState<Record<string, IClerkUser>>({});
@@ -57,6 +93,20 @@ export function NavMain({
     displayName: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+
+  // Automatically expand group if it matches selectedGroupId from URL
+  React.useEffect(() => {
+    if (selectedGroupId) {
+      setOpenGroups(prev => ({ ...prev, [selectedGroupId]: true }));
+    }
+  }, [selectedGroupId]);
+
+  const handleSelectGroup = (groupId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("groupId", groupId);
+    router.push(`${pathname}?${params.toString()}`);
+    setOpenGroups(prev => ({ ...prev, [groupId]: true }));
+  };
 
   const handleConfirmDelete = async () => {
     if (!deletingInvite) return;
@@ -73,12 +123,31 @@ export function NavMain({
     }
   };
 
+  const searchParamsRef = React.useRef(searchParams);
+  searchParamsRef.current = searchParams;
+  const pathnameRef = React.useRef(pathname);
+  pathnameRef.current = pathname;
+
   const fetchGroupsAndMembers = React.useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
       const groupData = await getGroupsApi({ clerkId: user.id });
       setGroups(groupData);
+
+      // Auto redirect to first group in sidebar if query param is missing or invalid
+      if (groupData.length > 0) {
+        const currentParams = searchParamsRef.current;
+        const currentGroupId = currentParams.get("groupId");
+        const exists = groupData.some(g => g.id === currentGroupId);
+        if (!currentGroupId || !exists) {
+          const firstGroupId = groupData[0].id;
+          const params = new URLSearchParams(currentParams.toString());
+          params.set("groupId", firstGroupId);
+          router.replace(`${pathnameRef.current}?${params.toString()}`);
+          setOpenGroups(prev => ({ ...prev, [firstGroupId]: true }));
+        }
+      }
 
       // Collect all clerkIds from userReceived in invitations
       const allClerkIds = Array.from(
@@ -103,7 +172,7 @@ export function NavMain({
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, router]);
 
   React.useEffect(() => {
     if (isSignedIn && user?.id) {
@@ -111,7 +180,7 @@ export function NavMain({
     }
   }, [isSignedIn, user?.id, fetchGroupsAndMembers]);
 
-  // Listen for groups-updated or invitations-updated events to re-fetch
+  // Listen for groups-updated or invitations-updated events to re-fetch + Pusher realtime events
   React.useEffect(() => {
     const handleUpdate = () => {
       fetchGroupsAndMembers();
@@ -120,9 +189,51 @@ export function NavMain({
     window.addEventListener("groups-updated", handleUpdate);
     window.addEventListener("invitations-updated", handleUpdate);
 
+    // Setup Pusher realtime listener
+    const pusher = getPusherClient();
+    let invitationsChannel: any = null;
+    let groupsChannel: any = null;
+
+    if (pusher) {
+      invitationsChannel = pusher.subscribe("invitations-channel");
+
+      invitationsChannel.bind("invitation-updated", () => {
+        fetchGroupsAndMembers();
+      });
+      invitationsChannel.bind("invitation-received", () => {
+        fetchGroupsAndMembers();
+      });
+      invitationsChannel.bind("invitation-deleted", () => {
+        fetchGroupsAndMembers();
+      });
+
+      groupsChannel = pusher.subscribe("groups-channel");
+
+      groupsChannel.bind("group-created", () => {
+        fetchGroupsAndMembers();
+      });
+      groupsChannel.bind("group-updated", () => {
+        fetchGroupsAndMembers();
+      });
+      groupsChannel.bind("group-deleted", () => {
+        fetchGroupsAndMembers();
+      });
+    }
+
     return () => {
       window.removeEventListener("groups-updated", handleUpdate);
       window.removeEventListener("invitations-updated", handleUpdate);
+
+      if (pusher) {
+        if (invitationsChannel) {
+          invitationsChannel.unbind_all();
+          pusher.unsubscribe("invitations-channel");
+        }
+        if (groupsChannel) {
+          groupsChannel.unbind_all();
+          pusher.unsubscribe("groups-channel");
+        }
+      }
     };
   }, [fetchGroupsAndMembers]);
 
@@ -151,12 +262,25 @@ export function NavMain({
           groups.map(group => {
             const invitations = group.invitations || [];
             const dotColor = COLOR_MAP[group.color || "gray"] || "bg-slate-400";
+            const isSelected = selectedGroupId === group.id;
+            const isOpen = openGroups[group.id] ?? (isSelected || false);
+            const theme = GROUP_THEME_MAP[group.color || "gray"] || GROUP_THEME_MAP.gray;
 
             return (
-              <Collapsible key={group.id} asChild defaultOpen={true} className="group/collapsible">
-                <SidebarMenuItem>
+              <Collapsible
+                key={group.id}
+                asChild
+                open={isOpen}
+                onOpenChange={open => setOpenGroups(prev => ({ ...prev, [group.id]: open }))}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem className={cn("rounded-lg border border-transparent transition-all duration-200")}>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={group.name} className="flex items-center gap-2">
+                    <SidebarMenuButton
+                      tooltip={group.name}
+                      onClick={() => handleSelectGroup(group.id)}
+                      className={cn("flex items-center gap-2 transition-colors", isSelected && theme.buttonActive)}
+                    >
                       <span className={cn("size-2 shrink-0 rounded-full", dotColor)} />
                       <span className="flex-1 truncate text-left font-medium">{group.name}</span>
                       <span className="text-[10px] font-normal text-muted-foreground">({invitations.length})</span>
@@ -165,12 +289,20 @@ export function NavMain({
                   </CollapsibleTrigger>
 
                   <CollapsibleContent>
-                    <SidebarMenuSub className="mr-0 pr-0">
+                    <SidebarMenuSub
+                      className={cn(
+                        "mr-0 pr-0",
+                        isSelected
+                          ? cn("border p-0.5", theme.itemActive, "rounded-lg border border-transparent transition-all duration-200")
+                          : "hover:bg-sidebar-accent/40"
+                      )}
+                    >
                       {invitations.length > 0 &&
                         invitations.map(invitation => {
                           const isPending = invitation.status === "PENDING";
                           const clerkId = invitation.userReceived?.clerkId;
                           const clerkUser = clerkId ? clerkUsersMap[clerkId] : null;
+                          const isOwner = invitation.userReceived?.id === group.ownerId;
 
                           const displayName = clerkUser?.userName || (clerkId ? `User (${clerkId.slice(-4)})` : invitation.code);
                           const avatarSrc = clerkUser?.imageUrl || undefined;
@@ -192,7 +324,9 @@ export function NavMain({
                                     <AvatarFallback className="text-[9px] font-bold">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
                                   </Avatar>
 
-                                  <span className="flex-1 truncate text-xs">{displayName}</span>
+                                  <span className="flex flex-1 items-center gap-2 truncate text-xs">
+                                    {displayName} {isOwner && <Crown className="size-3.5 text-yellow-500" />}
+                                  </span>
 
                                   {isPending && (
                                     <span
@@ -200,34 +334,37 @@ export function NavMain({
                                       className="py-0.2 flex shrink-0 items-center gap-0.5 rounded border border-amber-500/25 bg-amber-500/15 px-1 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400"
                                     >
                                       <Clock className="size-2.5" />
-                                      <span>Pending</span>
                                     </span>
                                   )}
 
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-6 shrink-0 text-red-600 hover:bg-red-600/10 hover:text-red-700"
-                                    title="Remove member"
-                                    onClick={e => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setDeletingInvite({
-                                        invitation,
-                                        displayName,
-                                      });
-                                      setUserDelete(displayName);
-                                    }}
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
+                                  {!isOwner ||
+                                    isPending && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6 shrink-0 text-red-600 hover:bg-red-600/10 hover:text-red-700"
+                                        title="Remove member"
+                                        onClick={e => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setDeletingInvite({
+                                            invitation,
+                                            displayName,
+                                          });
+                                          setUserDelete(displayName);
+                                        }}
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </Button>
+                                    )}
                                 </div>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           );
                         })}
-                      <AddInvitationDialog>
+
+                      <AddInvitationDialog groupId={group.id} groupName={group.name}>
                         <Button variant="ghost" className="w-full justify-start gap-2 px-2 text-left">
                           <UserPlus className="size-4" />
                           <span>Invite friends</span>

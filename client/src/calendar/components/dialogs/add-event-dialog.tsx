@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { AlertTriangle } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,11 +21,22 @@ import { Dialog, DialogHeader, DialogClose, DialogContent, DialogTrigger, Dialog
 
 import { createEventApi } from "@/calendar/requests";
 import { eventSchema } from "@/calendar/schemas";
+import { cn } from "@/lib/utils";
 
 import type { TimeValue } from "react-aria-components";
 import type { TEventFormData } from "@/calendar/schemas";
 import type { IEvent } from "@/calendar/interfaces";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+const COLOR_MAP: Record<string, string> = {
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  red: "bg-rose-500",
+  yellow: "bg-amber-500",
+  purple: "bg-purple-500",
+  orange: "bg-orange-500",
+  gray: "bg-slate-400",
+};
 
 interface IProps {
   children: React.ReactNode;
@@ -33,17 +45,25 @@ interface IProps {
 }
 
 export function AddEventDialog({ children, startDate, startTime }: IProps) {
-  const { users, setLocalEvents, isMockMode } = useCalendar();
+  const { users, setLocalEvents, isMockMode, selectedGroupId, groups } = useCalendar();
+  const searchParams = useSearchParams();
+  const queryGroupId = searchParams.get("groupId") || selectedGroupId || "";
+  const currentGroup = groups.find(g => g.id === queryGroupId);
 
   const { isOpen, onClose, onToggle } = useDisclosure();
 
   const form = useForm<TEventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
+      user: users[0]?.id || "",
       title: "",
       description: "",
       startDate: typeof startDate !== "undefined" ? startDate : undefined,
       startTime: typeof startTime !== "undefined" ? startTime : undefined,
+      color: "blue",
+      groupId: queryGroupId || undefined,
+      status: "TODO",
+      priority: "MEDIUM",
     },
   });
 
@@ -57,6 +77,8 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
     const endDateTime = new Date(values.endDate);
     endDateTime.setHours(values.endTime.hour, values.endTime.minute);
 
+    const targetGroupId = values.groupId || queryGroupId || selectedGroupId || undefined;
+
     const tempId = `temp-${Date.now()}`;
     const newEvent: IEvent = {
       id: tempId,
@@ -66,6 +88,9 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
       endDate: endDateTime.toISOString(),
       color: values.color,
       user,
+      groupId: targetGroupId,
+      status: values.status,
+      priority: values.priority,
     };
 
     setLocalEvents(prev => [...prev, newEvent]);
@@ -81,10 +106,14 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
           endDate: endDateTime.toISOString(),
           color: values.color,
           userId: user.id,
+          groupId: targetGroupId,
+          status: values.status,
+          priority: values.priority,
         });
         if (created?.id) {
           setLocalEvents(prev => prev.map(e => (e.id === tempId ? { ...e, id: created.id } : e)));
         }
+        window.dispatchEvent(new CustomEvent("events-updated"));
       } catch {
         // Handle or ignore offline sync error
       }
@@ -92,11 +121,20 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
   };
 
   useEffect(() => {
-    form.reset({
-      startDate,
-      startTime,
-    });
-  }, [startDate, startTime, form]);
+    if (isOpen) {
+      form.reset({
+        user: users[0]?.id || "",
+        title: "",
+        description: "",
+        startDate,
+        startTime,
+        color: "blue",
+        groupId: queryGroupId || undefined,
+        status: "TODO",
+        priority: "MEDIUM",
+      });
+    }
+  }, [isOpen, startDate, startTime, queryGroupId, users, form]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onToggle}>
@@ -104,44 +142,81 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Event</DialogTitle>
+          <DialogTitle>
+            Add New Event to group
+            <span className={cn("ml-1 font-medium", currentGroup?.color ? `text-${currentGroup?.color}-500` : "text-blue-500")}>
+              {currentGroup?.name ? `${currentGroup.name}` : ""}
+            </span>
+          </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh]">
           <Form {...form}>
-            <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="grid p-1">
-              <FormField
-                control={form.control}
-                name="user"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>Responsible</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger data-invalid={fieldState.invalid}>
-                          <SelectValue placeholder="Select an option" />
-                        </SelectTrigger>
+            <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="grid space-y-1 p-1">
+              <div className="grid grid-cols-2 gap-2">
+                <FormField
+                  control={form.control}
+                  name="user"
+                  render={({ field, fieldState }) => (
+                    <FormItem>
+                      <FormLabel>Responsible</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger data-invalid={fieldState.invalid}>
+                            <SelectValue placeholder="Select an option" />
+                          </SelectTrigger>
 
-                        <SelectContent>
-                          {users.map(user => (
-                            <SelectItem key={user.id} value={user.id} className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Avatar key={user.id} className="size-6">
-                                  <AvatarImage src={user.picturePath ?? undefined} alt={user.name} />
-                                  <AvatarFallback className="text-xxs">{user.name[0]}</AvatarFallback>
-                                </Avatar>
+                          <SelectContent>
+                            {users.map(user => (
+                              <SelectItem key={user.id} value={user.id} className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <Avatar key={user.id} className="size-6">
+                                    <AvatarImage src={user.picturePath ?? undefined} alt={user.name} />
+                                    <AvatarFallback className="text-xxs">{user.name[0]}</AvatarFallback>
+                                  </Avatar>
 
-                                <p className="truncate">{user.name}</p>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                                  <p className="truncate">{user.name}</p>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {groups.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="groupId"
+                    render={({ field, fieldState }) => (
+                      <FormItem>
+                        <FormLabel>Group</FormLabel>
+                        <FormControl>
+                          <Select value={field.value || ""} onValueChange={field.onChange}>
+                            <SelectTrigger data-invalid={fieldState.invalid}>
+                              <SelectValue placeholder="Select a group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {groups.map(group => (
+                                <SelectItem key={group.id} value={group.id}>
+                                  <div className="flex items-center gap-2">
+                                    <span className={cn("size-2.5 rounded-full", COLOR_MAP[group.color || "gray"] || "bg-slate-400")} />
+                                    <span>{group.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+              </div>
 
               <FormField
                 control={form.control}
@@ -171,7 +246,12 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
                         <SingleDayPicker
                           id="startDate"
                           value={field.value}
-                          onSelect={date => field.onChange(date as Date)}
+                          onSelect={date => {
+                            field.onChange(date as Date);
+                            if (date) {
+                              form.setValue("startTime", { hour: 0, minute: 0 }, { shouldValidate: true });
+                            }
+                          }}
                           placeholder="Select a date"
                           data-invalid={fieldState.invalid}
                         />
@@ -209,7 +289,12 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
                       <FormControl>
                         <SingleDayPicker
                           value={field.value}
-                          onSelect={date => field.onChange(date as Date)}
+                          onSelect={date => {
+                            field.onChange(date as Date);
+                            if (date) {
+                              form.setValue("endTime", { hour: 23, minute: 59 }, { shouldValidate: true });
+                            }
+                          }}
                           placeholder="Select a date"
                           data-invalid={fieldState.invalid}
                         />
@@ -236,74 +321,164 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="color"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>Color</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger data-invalid={fieldState.invalid}>
-                          <SelectValue placeholder="Select an option" />
-                        </SelectTrigger>
+              <div className="flex items-start justify-between gap-2">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field, fieldState }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Status</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger data-invalid={fieldState.invalid}>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="TODO">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-slate-400" />
+                                <span>To Do</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="IN_PROGRESS">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-blue-500" />
+                                <span>In Progress</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="DONE">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-emerald-500" />
+                                <span>Done</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="CANCELLED">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-rose-500" />
+                                <span>Cancelled</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                        <SelectContent>
-                          <SelectItem value="blue">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-blue-600" />
-                              Blue
-                            </div>
-                          </SelectItem>
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field, fieldState }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Priority</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger data-invalid={fieldState.invalid}>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="LOW">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-emerald-500" />
+                                <span>Low</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="MEDIUM">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-amber-500" />
+                                <span>Medium</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="HIGH">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-orange-500" />
+                                <span>High</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="URGENT">
+                              <div className="flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-rose-600" />
+                                <span>Urgent</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                          <SelectItem value="green">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-green-600" />
-                              Green
-                            </div>
-                          </SelectItem>
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field, fieldState }) => (
+                    <FormItem>
+                      <FormLabel>Color</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger data-invalid={fieldState.invalid}>
+                            <SelectValue placeholder="Select an option" />
+                          </SelectTrigger>
 
-                          <SelectItem value="red">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-red-600" />
-                              Red
-                            </div>
-                          </SelectItem>
+                          <SelectContent>
+                            <SelectItem value="blue">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-blue-600" />
+                                Blue
+                              </div>
+                            </SelectItem>
 
-                          <SelectItem value="yellow">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-yellow-600" />
-                              Yellow
-                            </div>
-                          </SelectItem>
+                            <SelectItem value="green">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-green-600" />
+                                Green
+                              </div>
+                            </SelectItem>
 
-                          <SelectItem value="purple">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-purple-600" />
-                              Purple
-                            </div>
-                          </SelectItem>
+                            <SelectItem value="red">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-red-600" />
+                                Red
+                              </div>
+                            </SelectItem>
 
-                          <SelectItem value="orange">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-orange-600" />
-                              Orange
-                            </div>
-                          </SelectItem>
+                            <SelectItem value="yellow">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-yellow-600" />
+                                Yellow
+                              </div>
+                            </SelectItem>
 
-                          <SelectItem value="gray">
-                            <div className="flex items-center gap-2">
-                              <div className="size-3.5 rounded-full bg-neutral-600" />
-                              Gray
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                            <SelectItem value="purple">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-purple-600" />
+                                Purple
+                              </div>
+                            </SelectItem>
+
+                            <SelectItem value="orange">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-orange-600" />
+                                Orange
+                              </div>
+                            </SelectItem>
+
+                            <SelectItem value="gray">
+                              <div className="flex items-center gap-2">
+                                <div className="size-3.5 rounded-full bg-neutral-600" />
+                                Gray
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}

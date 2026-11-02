@@ -13,7 +13,7 @@ export function useUpdateEvent() {
     newEvent.endDate = new Date(event.endDate).toISOString();
 
     setLocalEvents(prev => {
-      const index = prev.findIndex(e => e.id === event.id);
+      const index = prev.findIndex(e => String(e.id) === String(event.id));
       if (index === -1) return prev;
       return [...prev.slice(0, index), newEvent, ...prev.slice(index + 1)];
     });

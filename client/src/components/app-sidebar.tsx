@@ -5,14 +5,16 @@ import { AudioWaveform, Command, GalleryVerticalEnd, LogIn, Sparkles, SquareTerm
 import * as React from "react";
 
 import { AddInvitationDialog } from "@/calendar/components/dialogs/add-invitation-dialog";
+import { PendingInvitationsDialog } from "@/calendar/components/dialogs/pending-invitations-dialog";
 import CalendarSettings from "@/calendar/components/dialogs/calendar-settings";
 import { ManageGroupsDialog } from "@/calendar/components/dialogs/manage-groups-dialog";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
 import { Button } from "@/components/ui/button";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarRail, useSidebar } from "@/components/ui/sidebar";
 import Link from "next/link";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // This is sample data.
 const data = {
@@ -38,32 +40,12 @@ const data = {
       plan: "Free",
     },
   ],
-  navMain: [
-    {
-      title: "Groups",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isSignedIn, isLoaded, user } = useUser();
+  const { toggleSidebar } = useSidebar();
+  const isMobile = useIsMobile();
 
   const currentUser = React.useMemo(() => {
     if (!user) return data.user;
@@ -86,7 +68,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         ) : isSignedIn ? (
           <>
-            <NavMain items={data.navMain} />
+            <NavMain />
+
+            <PendingInvitationsDialog />
 
             <CalendarSettings />
           </>
@@ -142,13 +126,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <button
                   className="flex h-9 w-full flex-1 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0"
                   title="Sign In"
+                  onClick={isMobile ? toggleSidebar : undefined}
                 >
                   <LogIn className="hidden size-4 group-data-[collapsible=icon]:block" />
                   <span className="group-data-[collapsible=icon]:hidden">Sign In</span>
                 </button>
               </SignInButton>
               <SignUpButton mode="modal">
-                <button className="h-9 w-full flex-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 group-data-[collapsible=icon]:hidden">
+                <button
+                  className="h-9 w-full flex-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 group-data-[collapsible=icon]:hidden"
+                  onClick={isMobile ? toggleSidebar : undefined}
+                >
                   Sign Up
                 </button>
               </SignUpButton>

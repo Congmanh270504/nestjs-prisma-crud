@@ -2,55 +2,101 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { generateRandomCode } from 'src/helper';
+import { InvitationStatus } from '@prisma/client';
+import { PusherService } from '../pusher/pusher.service';
 
 @Injectable()
 export class InvitationsService {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService, private pusher: PusherService) {}
 
     async create(dto: CreateInvitationDto) {
-        let groupId = dto.groupId;
+        const groupId = dto.groupId;
 
-        // If groupId is not provided, find or create a default group
+        console.log(groupId);
+
         if (!groupId) {
-            const existingGroup = await this.prisma.groups.findFirst({
-                where: dto.userSentId ? { ownerId: dto.userSentId } : undefined,
+            throw new BadRequestException('Group ID is required');
+        }
+
+        let userSentId = dto.userSentId;
+        if (userSentId) {
+            const user = await this.prisma.user.findFirst({
+                where: {
+                    OR: [{ id: userSentId }, { clerkId: userSentId }],
+                },
             });
 
-            if (existingGroup) {
-                groupId = existingGroup.id;
-            } else {
-                // Fallback: pick any user or userSentId as group owner
-                const owner = dto.userSentId
-                    ? await this.prisma.user.findUnique({
-                          where: { id: dto.userSentId },
-                      })
-                    : await this.prisma.user.findFirst();
+            if (!user && userSentId.startsWith('user_')) {
+                throw new BadRequestException('User sent ID is required');
+            }
 
-                if (!owner) {
-                    throw new BadRequestException(
-                        'No user available to own the group',
-                    );
-                }
-
-                const newGroup = await this.prisma.groups.create({
-                    data: {
-                        name: 'LoL Squad',
-                        ownerId: owner.id,
-                        color: 'gold',
-                    },
-                });
-                groupId = newGroup.id;
+            if (user) {
+                userSentId = user.id;
             }
         }
 
-        return this.prisma.invitations.create({
+        let userReceivedId = dto.userReceivedId;
+        if (userReceivedId) {
+            const user = await this.prisma.user.findFirst({
+                where: {
+                    OR: [{ id: userReceivedId }, { clerkId: userReceivedId }],
+                },
+            });
+
+            if (!user && userReceivedId.startsWith('user_')) {
+                throw new BadRequestException('User received ID is required');
+            }
+
+            if (user) {
+                userReceivedId = user.id;
+            }
+        }
+
+        const invitation = await this.prisma.invitations.create({
             data: {
                 code: generateRandomCode(dto.code),
                 groupId,
-                userSentId: dto.userSentId,
-                userReceivedId: dto.userReceivedId,
-                des: dto.des || 'Friend request sent via League Client Dialog',
+                userSentId,
+                userReceivedId,
+                des: dto.des || 'Invitation request sent via Invitation Dialog',
             },
+            include: {
+                group: true,
+                userSent: true,
+                userReceived: true,
+            },
+        });
+
+        await this.pusher.trigger(
+            'invitations-channel',
+            'invitation-received',
+            invitation,
+        );
+
+        return invitation;
+    }
+
+    async findAll(filter?: { status?: InvitationStatus; clerkId?: string }) {
+        console.log(filter?.clerkId);
+        const where: any = {};
+        if (filter?.status) {
+            where.status = filter.status;
+        }
+
+        if (filter?.clerkId) {
+            where.userReceived = {
+                clerkId: filter.clerkId,
+            };
+            where.NOT = {
+                userSent: {
+                    clerkId: filter.clerkId,
+                },
+            };
+        }
+
+        return this.prisma.invitations.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
             include: {
                 group: true,
                 userSent: true,
@@ -59,15 +105,38 @@ export class InvitationsService {
         });
     }
 
-    async findAll() {
-        return this.prisma.invitations.findMany({
-            orderBy: { createdAt: 'desc' },
+    async updateStatus(id: string, status: InvitationStatus) {
+        const updated = await this.prisma.invitations.update({
+            where: { id },
+            data: { status },
             include: {
                 group: true,
                 userSent: true,
                 userReceived: true,
             },
         });
+
+        if (status === 'REJECTED') {
+            const deleted = await this.prisma.invitations.delete({
+                where: { id },
+            });
+
+            await this.pusher.trigger(
+                'invitations-channel',
+                'invitation-deleted',
+                deleted,
+            );
+
+            return deleted;
+        }
+
+        await this.pusher.trigger(
+            'invitations-channel',
+            'invitation-updated',
+            updated,
+        );
+
+        return updated;
     }
 
     async findOne(id: string) {
@@ -82,8 +151,16 @@ export class InvitationsService {
     }
 
     async delete(id: string) {
-        return this.prisma.invitations.delete({
+        const deleted = await this.prisma.invitations.delete({
             where: { id },
         });
+
+        await this.pusher.trigger(
+            'invitations-channel',
+            'invitation-deleted',
+            deleted,
+        );
+
+        return deleted;
     }
 }

@@ -24,6 +24,8 @@ export interface IEvent {
   user: IUser;
   status?: string;
   priority?: string;
+  groupId?: string;
+  group?: { id: string; name: string; color?: string | null } | null;
   project?: { id: string; name: string; color: string } | null;
   reminders?: IReminder[];
 }

@@ -14,6 +14,7 @@ export function ClerkSyncUser() {
       syncUserApi(user.id).then((result) => {
         if (result) {
           console.log("✅ [ClerkSyncUser] Successfully synced clerkId to DB:", user.id);
+          window.dispatchEvent(new CustomEvent("groups-updated"));
         }
       });
     }

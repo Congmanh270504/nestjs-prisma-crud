@@ -7,15 +7,23 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('recent')
-  findRecent(@Query('limit') limit?: string) {
+  findRecent(
+    @Query('limit') limit?: string,
+    @Query('groupId') groupId?: string,
+    @Query('excludeGroupId') excludeGroupId?: string,
+  ) {
     const take = limit ? parseInt(limit, 10) : 20;
-    return this.usersService.findAll(take);
+    return this.usersService.findAll(take, groupId, excludeGroupId);
   }
 
   @Get()
-  findAll(@Query('limit') limit?: string) {
+  findAll(
+    @Query('limit') limit?: string,
+    @Query('groupId') groupId?: string,
+    @Query('excludeGroupId') excludeGroupId?: string,
+  ) {
     const take = limit ? parseInt(limit, 10) : 20;
-    return this.usersService.findAll(take);
+    return this.usersService.findAll(take, groupId, excludeGroupId);
   }
 
   @Get(':id')

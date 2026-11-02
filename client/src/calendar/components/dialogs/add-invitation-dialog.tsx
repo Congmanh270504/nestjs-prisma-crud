@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUser } from "@clerk/nextjs";
 import { UserPlus, Check, Loader2 } from "lucide-react";
 import { FramedDialog } from "@/components/framed-dialog";
 import { getRecentUsers, createInvitationApi, type IClerkUser } from "@/calendar/requests";
@@ -13,6 +14,7 @@ interface AddInvitationDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   groupId?: string;
+  groupName?: string;
 }
 
 function UserAvatar({ src, alt }: { src?: string | null; alt: string }) {
@@ -30,7 +32,8 @@ function UserAvatar({ src, alt }: { src?: string | null; alt: string }) {
   );
 }
 
-export function AddInvitationDialog({ children, open: controlledOpen, onOpenChange: controlledOnOpenChange, groupId }: AddInvitationDialogProps) {
+export function AddInvitationDialog({ children, open: controlledOpen, onOpenChange: controlledOnOpenChange, groupId, groupName }: AddInvitationDialogProps) {
+  const { user } = useUser();
   const [internalOpen, setInternalOpen] = React.useState(false);
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : internalOpen;
@@ -38,19 +41,20 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
 
   const [gameName, setGameName] = React.useState("");
   const [tagline, setTagline] = React.useState("");
+  const [selectedUser, setSelectedUser] = React.useState<IClerkUser | null>(null);
   const [recentUsers, setRecentUsers] = React.useState<IClerkUser[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<{ text: string; isError?: boolean } | null>(null);
 
-  // Fetch recent 20 users from DB and query Clerk for user profile info
+  // Fetch recent 20 users from DB (excluding users with invitations in this group) and query Clerk for user profile info
   React.useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
     setLoading(true);
 
-    getRecentUsers(20)
+    getRecentUsers(20, groupId)
       .then(data => {
         if (!isMounted) return;
         setRecentUsers(data);
@@ -65,10 +69,11 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
     return () => {
       isMounted = false;
     };
-  }, [isOpen]);
+  }, [isOpen, groupId]);
 
   // Handle clicking a user from the recent list
   const handleSelectUser = (userItem: IClerkUser) => {
+    setSelectedUser(userItem);
     setGameName(userItem.userName || "");
     setTagline(userItem.id.slice(-4).toUpperCase());
     setStatusMessage(null);
@@ -89,13 +94,19 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
       await createInvitationApi({
         code: inviteCode,
         groupId: groupId,
-        des: `Friend request sent to ${gameName.trim()} ${fullTag}`,
+        userSentId: user?.id,
+        userReceivedId: selectedUser?.id,
+        des: `Invite request sent to ${gameName.trim()} `,
       });
 
       setStatusMessage({
-        text: `Friend request sent to ${gameName.trim()} ${fullTag}!`,
+        text: `Invite request sent to ${gameName.trim()}!`,
         isError: false,
       });
+
+      if (selectedUser) {
+        setRecentUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+      }
 
       window.dispatchEvent(new CustomEvent("invitations-updated"));
 
@@ -103,6 +114,7 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
       setTimeout(() => {
         setGameName("");
         setTagline("");
+        setSelectedUser(null);
       }, 1500);
     } catch (err: any) {
       console.error("Error sending invitation:", err);
@@ -119,7 +131,7 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
     <FramedDialog
       open={isOpen}
       onOpenChange={setIsOpen}
-      title="Add Friends"
+      title={groupName ? `Invite to ${groupName}` : "Add Friends"}
       trigger={
         children ?? (
           <Button
@@ -134,8 +146,8 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
     >
       {/* Modal Header */}
       <div className="text-center">
-        <h2 className="text-xl font-bold uppercase tracking-[0.2em] text-slate-900 dark:text-[#f0e6d2] sm:text-2xl">Invitations</h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-[#a09b8c] sm:text-sm">Already know your friend&apos;s Riot ID? Send them a friend request!</p>
+        <h2 className="text-xl font-bold uppercase tracking-[0.2em] text-slate-900 dark:text-[#f0e6d2] sm:text-2xl">Invitation to {groupName || "Group"}</h2>
+        <p className="mt-1 text-xs text-slate-500 dark:text-[#a09b8c] sm:text-sm">Send invitation to your co-workers to join your group</p>
       </div>
 
       {/* Input & Add Friend row */}
@@ -144,8 +156,13 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
           <Input
             type="text"
             value={gameName}
-            onChange={e => setGameName(e.target.value)}
-            placeholder="Game Name"
+            onChange={e => {
+              setGameName(e.target.value);
+              if (selectedUser && e.target.value !== selectedUser.userName) {
+                setSelectedUser(null);
+              }
+            }}
+            placeholder="User name"
             className="h-10 rounded-md border border-[#c8aa6e]/60 bg-slate-50/90 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[#9e7938] focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-[#785a28] dark:bg-[#091428]/90 dark:text-[#f0e6d2] dark:placeholder:text-[#5c5b57] dark:focus-visible:border-[#c8aa6e]"
           />
         </div>
@@ -161,7 +178,7 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
               Sending...
             </>
           ) : (
-            "Add Friend"
+            "Invite to group"
           )}
         </Button>
       </form>
@@ -176,19 +193,14 @@ export function AddInvitationDialog({ children, open: controlledOpen, onOpenChan
         </div>
       )}
 
-      {/* Subtitle: RECENTLY PLAYED WITH */}
-      <div className="mb-3 mt-7">
-        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-[#a09b8c]">RECENTLY PLAYED WITH</span>
-      </div>
-
       {/* Users Grid (3 columns, 20 users max) */}
-      <div className="max-h-[290px] overflow-y-auto pr-1 [&::-webkit-scrollbar-thumb]:bg-[#c8aa6e]/60 hover:[&::-webkit-scrollbar-thumb]:bg-[#9e7938] dark:[&::-webkit-scrollbar-thumb]:bg-[#785a28] dark:hover:[&::-webkit-scrollbar-thumb]:bg-[#c8aa6e] [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-[#010a13] [&::-webkit-scrollbar]:w-1.5">
+      <div className="mt-4 max-h-[290px] overflow-y-auto border pr-1 [&::-webkit-scrollbar-thumb]:bg-[#c8aa6e]/60 hover:[&::-webkit-scrollbar-thumb]:bg-[#9e7938] dark:[&::-webkit-scrollbar-thumb]:bg-[#785a28] dark:hover:[&::-webkit-scrollbar-thumb]:bg-[#c8aa6e] [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-[#010a13] [&::-webkit-scrollbar]:w-1.5">
         {loading ? (
           <div className="flex h-40 items-center justify-center">
             <Loader2 className="size-6 animate-spin text-[#9e7938] dark:text-[#c8aa6e]" />
           </div>
         ) : recentUsers.length === 0 ? (
-          <div className="flex h-32 items-center justify-center text-xs text-slate-500 dark:text-[#a09b8c]">Không có người dùng nào trong cơ sở dữ liệu.</div>
+          <div className="flex h-32 items-center justify-center text-xs text-slate-500 dark:text-[#a09b8c]">There is no users.</div>
         ) : (
           <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
             {recentUsers.map((userItem, index) => (

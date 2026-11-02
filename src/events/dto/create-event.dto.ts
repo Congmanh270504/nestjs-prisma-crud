@@ -28,7 +28,7 @@ export class CreateEventDto {
 
   @IsString()
   @IsOptional()
-  projectId?: string;
+  groupId?: string;
 
   @IsEnum(TaskStatus)
   @IsOptional()
