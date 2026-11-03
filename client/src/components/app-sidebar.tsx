@@ -1,7 +1,7 @@
 "use client";
 
 import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
-import { AudioWaveform, Command, GalleryVerticalEnd, LogIn, Sparkles, SquareTerminal, UserPlus, Users } from "lucide-react";
+import { ArrowUpRight, AudioWaveform, Command, GalleryVerticalEnd, LogIn, Sparkles, SquareTerminal, UserPlus, Users } from "lucide-react";
 import * as React from "react";
 
 import { AddInvitationDialog } from "@/calendar/components/dialogs/add-invitation-dialog";
@@ -73,6 +73,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <PendingInvitationsDialog />
 
             <CalendarSettings />
+
+            <Link
+              href="https://github.com/Congmanh270504/nestjs-prisma-crud"
+              target="_blank"
+              className="ml-4 inline-flex gap-0.5 text-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              View on GitHub
+              <ArrowUpRight size={14} className="text-foreground" />
+            </Link>
           </>
         ) : (
           <SidebarGroup className="p-2 group-data-[collapsible=icon]:p-0">
@@ -121,6 +130,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </Link>
               . Don't worry about your personal information!
             </p>
+            <Link
+              href="https://github.com/Congmanh270504/nestjs-prisma-crud"
+              target="_blank"
+              className="inline-flex gap-0.5 text-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              View on GitHub
+              <ArrowUpRight size={14} className="text-foreground" />
+            </Link>
             <div className="flex items-center gap-2 group-data-[collapsible=icon]:flex-col">
               <SignInButton mode="modal">
                 <button
