@@ -136,7 +136,7 @@ export function PendingInvitationsDialog({ children, open: controlledOpen, onOpe
     <FramedDialog
       open={isOpen}
       onOpenChange={setIsOpen}
-      title="Friend Requests"
+      title="Group Requests"
       className="max-w-[460px]"
       innerClassName="md:px-2 md:py-4"
       trigger={
@@ -146,7 +146,7 @@ export function PendingInvitationsDialog({ children, open: controlledOpen, onOpe
             className="flex w-full items-center justify-start gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Mail className="size-4 text-[#9e7938] dark:text-[#c8aa6e]" />
-            <span className="flex-1 text-left">Friend Requests</span>
+            <span className="flex-1 text-left">Group Requests</span>
             {invitations.length > 0 && (
               <span className="flex size-4.5 min-w-4.5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black shadow-sm dark:bg-[#c8aa6e] dark:text-[#010a13]">
                 {invitations.length}

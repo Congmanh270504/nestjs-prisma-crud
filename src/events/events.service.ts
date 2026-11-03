@@ -4,12 +4,50 @@ import { PusherService } from '../pusher/pusher.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
+const TASK_INCLUDE = {
+    creator: { select: { id: true, clerkId: true } },
+    assignee: { select: { id: true, clerkId: true } },
+    group: { select: { id: true, name: true, color: true } },
+};
+
 @Injectable()
 export class EventsService {
-    constructor(
-        private prisma: PrismaService,
-        private pusher: PusherService,
-    ) {}
+    constructor(private prisma: PrismaService, private pusher: PusherService) {}
+
+    private formatTaskEvent(task: any) {
+        return {
+            id: task.id,
+            title: task.title,
+            description: task.description || '',
+            startDate: task.startDate.toISOString(),
+            endDate: task.endDate.toISOString(),
+            color: task.color,
+            status: task.status,
+            priority: task.priority,
+            user: {
+                id: task.creator?.id || task.creatorId,
+                clerkId: task.creator?.clerkId,
+            },
+            creatorId: task.creatorId,
+            creator: task.creator
+                ? {
+                      id: task.creator.id,
+                      clerkId: task.creator.clerkId,
+                  }
+                : undefined,
+            assigneeId: task.assigneeId,
+            assignee: task.assignee
+                ? {
+                      id: task.assignee.id,
+                      clerkId: task.assignee.clerkId,
+                  }
+                : null,
+            groupId: task.groupId,
+            group: task.group,
+            createdAt: task.createdAt?.toISOString(),
+            updatedAt: task.updatedAt?.toISOString(),
+        };
+    }
 
     async findAll(params: {
         startDate?: string;
@@ -38,68 +76,31 @@ export class EventsService {
 
         const tasks = await this.prisma.taskEvent.findMany({
             where,
-            include: {
-                creator: { select: { id: true, clerkId: true } },
-                assignee: { select: { id: true, clerkId: true } },
-                group: { select: { id: true, name: true, color: true } },
-            },
+            include: TASK_INCLUDE,
             orderBy: { startDate: 'asc' },
         });
 
-        // Map to frontend-friendly IEvent format
-        return tasks.map((task) => ({
-            id: task.id,
-            title: task.title,
-            description: task.description || '',
-            startDate: task.startDate.toISOString(),
-            endDate: task.endDate.toISOString(),
-            color: task.color,
-            status: task.status,
-            priority: task.priority,
-            user: {
-                id: task.creator.id,
-                clerkId: task.creator.clerkId,
-            },
-            groupId: task.groupId,
-            group: task.group,
-        }));
+        return tasks.map((task) => this.formatTaskEvent(task));
     }
 
     async findOne(id: string) {
         const task = await this.prisma.taskEvent.findUnique({
             where: { id },
-            include: {
-                creator: { select: { id: true, clerkId: true } },
-                assignee: { select: { id: true, clerkId: true } },
-                group: { select: { id: true, name: true, color: true } },
-            },
+            include: TASK_INCLUDE,
         });
 
         if (!task) {
             throw new NotFoundException(`Event with ID ${id} not found`);
         }
 
-        return {
-            id: task.id,
-            title: task.title,
-            description: task.description || '',
-            startDate: task.startDate.toISOString(),
-            endDate: task.endDate.toISOString(),
-            color: task.color,
-            status: task.status,
-            priority: task.priority,
-            user: {
-                id: task.creator.id,
-                clerkId: task.creator.clerkId,
-            },
-            groupId: task.groupId,
-            group: task.group,
-        };
+        return this.formatTaskEvent(task);
     }
 
     async create(dto: CreateEventDto) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: dto.userId },
+        const user = await this.prisma.user.findFirst({
+            where: {
+                OR: [{ id: dto.userId }, { clerkId: dto.userId }],
+            },
         });
 
         if (!user) {
@@ -123,41 +124,37 @@ export class EventsService {
             }
         }
 
+        let assigneeId: string | null = null;
+        if (dto.assigneeId && dto.assigneeId !== 'unassigned') {
+            const assigneeUser = await this.prisma.user.findFirst({
+                where: {
+                    OR: [{ id: dto.assigneeId }, { clerkId: dto.assigneeId }],
+                },
+            });
+            if (assigneeUser) {
+                assigneeId = assigneeUser.id;
+            }
+        }
+
+        const data: any = {
+            title: dto.title,
+            description: dto.description,
+            startDate: new Date(dto.startDate),
+            endDate: new Date(dto.endDate),
+            color: dto.color,
+            creatorId: user.id,
+            assigneeId,
+            groupId,
+            status: dto.status || 'TODO',
+            priority: dto.priority || 'MEDIUM',
+        };
+
         const task = await this.prisma.taskEvent.create({
-            data: {
-                title: dto.title,
-                description: dto.description,
-                startDate: new Date(dto.startDate),
-                endDate: new Date(dto.endDate),
-                color: dto.color,
-                creatorId: dto.userId,
-                groupId,
-                status: dto.status || 'TODO',
-                priority: dto.priority || 'MEDIUM',
-            },
-            include: {
-                creator: { select: { id: true, clerkId: true } },
-                assignee: { select: { id: true, clerkId: true } },
-                group: { select: { id: true, name: true, color: true } },
-            },
+            data,
+            include: TASK_INCLUDE,
         });
 
-        const formatted = {
-            id: task.id,
-            title: task.title,
-            description: task.description || '',
-            startDate: task.startDate.toISOString(),
-            endDate: task.endDate.toISOString(),
-            color: task.color,
-            status: task.status,
-            priority: task.priority,
-            user: {
-                id: task.creator.id,
-                clerkId: task.creator.clerkId,
-            },
-            groupId: task.groupId,
-            group: task.group,
-        };
+        const formatted = this.formatTaskEvent(task);
 
         await this.pusher.trigger('events-channel', 'event-created', formatted);
 
@@ -172,7 +169,31 @@ export class EventsService {
             data.startDate = new Date(dto.startDate);
         if (dto.endDate !== undefined) data.endDate = new Date(dto.endDate);
         if (dto.color !== undefined) data.color = dto.color;
-        if (dto.userId !== undefined) data.creatorId = dto.userId;
+        if (dto.userId !== undefined) {
+            const user = await this.prisma.user.findFirst({
+                where: {
+                    OR: [{ id: dto.userId }, { clerkId: dto.userId }],
+                },
+            });
+            if (user) {
+                data.creatorId = user.id;
+            }
+        }
+        if (dto.assigneeId !== undefined) {
+            if (dto.assigneeId && dto.assigneeId !== 'unassigned') {
+                const assigneeUser = await this.prisma.user.findFirst({
+                    where: {
+                        OR: [
+                            { id: dto.assigneeId },
+                            { clerkId: dto.assigneeId },
+                        ],
+                    },
+                });
+                data.assigneeId = assigneeUser ? assigneeUser.id : null;
+            } else {
+                data.assigneeId = null;
+            }
+        }
         if (dto.groupId !== undefined) data.groupId = dto.groupId;
         if (dto.status !== undefined) data.status = dto.status;
         if (dto.priority !== undefined) data.priority = dto.priority;
@@ -180,29 +201,10 @@ export class EventsService {
         const task = await this.prisma.taskEvent.update({
             where: { id },
             data,
-            include: {
-                creator: { select: { id: true, clerkId: true } },
-                assignee: { select: { id: true, clerkId: true } },
-                group: { select: { id: true, name: true, color: true } },
-            },
+            include: TASK_INCLUDE,
         });
 
-        const formatted = {
-            id: task.id,
-            title: task.title,
-            description: task.description || '',
-            startDate: task.startDate.toISOString(),
-            endDate: task.endDate.toISOString(),
-            color: task.color,
-            status: task.status,
-            priority: task.priority,
-            user: {
-                id: task.creator.id,
-                clerkId: task.creator.clerkId,
-            },
-            groupId: task.groupId,
-            group: task.group,
-        };
+        const formatted = this.formatTaskEvent(task);
 
         await this.pusher.trigger('events-channel', 'event-updated', formatted);
 

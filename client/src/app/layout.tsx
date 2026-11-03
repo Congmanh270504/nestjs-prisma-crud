@@ -23,9 +23,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Big Calendar by lramos33",
+  title: "Big Calendar by Cmanh",
   description:
-    "A feature-rich calendar application built with Next.js, TypeScript, and Tailwind CSS. This project provides a modern, responsive interface for managing events and schedules with multiple viewing options.",
+    "A feature-rich calendar application built with Next.js, TypeScript , Tailwind CSS and Nestjs, Postgresql with Prisma ORM . This project provides a modern, responsive interface for managing events and schedules with multiple viewing options.",
 };
 
 import { ClerkSyncUser } from "@/components/auth/clerk-sync-user";

@@ -135,7 +135,12 @@ export function CalendarProvider({ children, users: initialUsers, events: initia
     };
   }, [isSignedIn, currentGroupId, user?.id]);
 
-  // Keep ref of backendUsers for realtime user resolving without triggering resubscription
+  // Keep ref of currentGroupId and backendUsers for realtime resolving without triggering resubscription
+  const currentGroupIdRef = useRef(currentGroupId);
+  useEffect(() => {
+    currentGroupIdRef.current = currentGroupId;
+  }, [currentGroupId]);
+
   const backendUsersRef = useRef(backendUsers);
   useEffect(() => {
     backendUsersRef.current = backendUsers;
@@ -151,21 +156,45 @@ export function CalendarProvider({ children, users: initialUsers, events: initia
     const channel = pusher.subscribe("events-channel");
 
     const handleEventUpdated = (updatedEvent: IEvent) => {
-      // If filtering by group, check whether the event belongs to this group
-      if (!currentGroupId || updatedEvent.groupId === currentGroupId) {
+      console.log("📡 [Pusher] Received event-updated:", updatedEvent);
+      const activeGroupId = currentGroupIdRef.current;
+
+      // If viewing a specific group, check if this event belongs to this group
+      if (!activeGroupId || !updatedEvent.groupId || String(updatedEvent.groupId) === String(activeGroupId)) {
         setLocalEvents(prev => {
           const index = prev.findIndex(e => String(e.id) === String(updatedEvent.id));
           const existingUser = index !== -1 ? prev[index].user : undefined;
-          const groupMember = backendUsersRef.current.find(u => u.id === updatedEvent.user?.id);
-          const resolvedUser = {
+          const creatorMember = backendUsersRef.current.find(
+            u => u.id === (updatedEvent.creatorId || updatedEvent.creator?.id || updatedEvent.user?.id) ||
+                 (updatedEvent.creator?.clerkId && u.clerkId === updatedEvent.creator.clerkId)
+          );
+          const assigneeMember = updatedEvent.assigneeId || updatedEvent.assignee?.id
+            ? backendUsersRef.current.find(
+                u => u.id === (updatedEvent.assigneeId || updatedEvent.assignee?.id) ||
+                     (updatedEvent.assignee?.clerkId && u.clerkId === updatedEvent.assignee.clerkId)
+              )
+            : null;
+          const resolvedCreator = {
             ...existingUser,
             ...updatedEvent.user,
-            name: groupMember?.name || existingUser?.name || updatedEvent.user?.name || "User",
-            picturePath: groupMember?.picturePath ?? existingUser?.picturePath ?? updatedEvent.user?.picturePath ?? null,
+            ...updatedEvent.creator,
+            name: creatorMember?.name || existingUser?.name || updatedEvent.creator?.name || updatedEvent.user?.name || "User",
+            picturePath: creatorMember?.picturePath ?? existingUser?.picturePath ?? updatedEvent.creator?.picturePath ?? updatedEvent.user?.picturePath ?? null,
           };
+          const resolvedAssignee = assigneeMember
+            ? {
+                ...updatedEvent.assignee,
+                id: assigneeMember.id,
+                clerkId: assigneeMember.clerkId,
+                name: assigneeMember.name,
+                picturePath: assigneeMember.picturePath,
+              }
+            : updatedEvent.assignee;
           const resolvedEvent: IEvent = {
             ...updatedEvent,
-            user: resolvedUser,
+            user: resolvedCreator,
+            creator: resolvedCreator,
+            assignee: resolvedAssignee,
           };
 
           if (index !== -1) {
@@ -182,18 +211,41 @@ export function CalendarProvider({ children, users: initialUsers, events: initia
     };
 
     const handleEventCreated = (newEvent: IEvent) => {
-      if (!currentGroupId || newEvent.groupId === currentGroupId) {
+      console.log("📡 [Pusher] Received event-created:", newEvent);
+      const activeGroupId = currentGroupIdRef.current;
+      if (!activeGroupId || !newEvent.groupId || String(newEvent.groupId) === String(activeGroupId)) {
         setLocalEvents(prev => {
           const exists = prev.some(e => String(e.id) === String(newEvent.id));
-          const groupMember = backendUsersRef.current.find(u => u.id === newEvent.user?.id);
-          const resolvedUser = {
+          const creatorMember = backendUsersRef.current.find(
+            u => u.id === (newEvent.creatorId || newEvent.creator?.id || newEvent.user?.id) ||
+                 (newEvent.creator?.clerkId && u.clerkId === newEvent.creator.clerkId)
+          );
+          const assigneeMember = newEvent.assigneeId || newEvent.assignee?.id
+            ? backendUsersRef.current.find(
+                u => u.id === (newEvent.assigneeId || newEvent.assignee?.id) ||
+                     (newEvent.assignee?.clerkId && u.clerkId === newEvent.assignee.clerkId)
+              )
+            : null;
+          const resolvedCreator = {
             ...newEvent.user,
-            name: groupMember?.name || newEvent.user?.name || "User",
-            picturePath: groupMember?.picturePath ?? newEvent.user?.picturePath ?? null,
+            ...newEvent.creator,
+            name: creatorMember?.name || newEvent.creator?.name || newEvent.user?.name || "User",
+            picturePath: creatorMember?.picturePath ?? newEvent.creator?.picturePath ?? newEvent.user?.picturePath ?? null,
           };
+          const resolvedAssignee = assigneeMember
+            ? {
+                ...newEvent.assignee,
+                id: assigneeMember.id,
+                clerkId: assigneeMember.clerkId,
+                name: assigneeMember.name,
+                picturePath: assigneeMember.picturePath,
+              }
+            : newEvent.assignee;
           const resolvedEvent: IEvent = {
             ...newEvent,
-            user: resolvedUser,
+            user: resolvedCreator,
+            creator: resolvedCreator,
+            assignee: resolvedAssignee,
           };
 
           if (exists) {
@@ -205,6 +257,7 @@ export function CalendarProvider({ children, users: initialUsers, events: initia
     };
 
     const handleEventDeleted = (data: { id: string | number; groupId?: string }) => {
+      console.log("📡 [Pusher] Received event-deleted:", data);
       setLocalEvents(prev => prev.filter(e => String(e.id) !== String(data.id)));
     };
 
@@ -218,7 +271,7 @@ export function CalendarProvider({ children, users: initialUsers, events: initia
       channel.unbind("event-deleted", handleEventDeleted);
       pusher.unsubscribe("events-channel");
     };
-  }, [isSignedIn, currentGroupId]);
+  }, [isSignedIn]);
 
   const handleSelectDate = (date: Date | undefined) => {
     if (!date) return;

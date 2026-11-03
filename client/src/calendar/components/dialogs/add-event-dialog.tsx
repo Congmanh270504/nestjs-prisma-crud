@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { AlertTriangle } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { AlertTriangle, User } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { useDisclosure } from "@/hooks/use-disclosure";
@@ -19,13 +20,13 @@ import { Form, FormField, FormLabel, FormItem, FormControl, FormMessage } from "
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogHeader, DialogClose, DialogContent, DialogTrigger, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-import { createEventApi } from "@/calendar/requests";
+import { createEventApi, getUsers } from "@/calendar/requests";
 import { eventSchema } from "@/calendar/schemas";
 import { cn } from "@/lib/utils";
 
 import type { TimeValue } from "react-aria-components";
 import type { TEventFormData } from "@/calendar/schemas";
-import type { IEvent } from "@/calendar/interfaces";
+import type { IEvent, IUser } from "@/calendar/interfaces";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const COLOR_MAP: Record<string, string> = {
@@ -45,17 +46,39 @@ interface IProps {
 }
 
 export function AddEventDialog({ children, startDate, startTime }: IProps) {
-  const { users, setLocalEvents, isMockMode, selectedGroupId, groups } = useCalendar();
+  const { users, setLocalEvents, isMockMode, selectedGroupId } = useCalendar();
+  const { user: clerkUser } = useUser();
   const searchParams = useSearchParams();
   const queryGroupId = searchParams.get("groupId") || selectedGroupId || "";
-  const currentGroup = groups.find(g => g.id === queryGroupId);
 
   const { isOpen, onClose, onToggle } = useDisclosure();
+
+  // Users belonging to queryGroupId only
+  const [groupUsers, setGroupUsers] = useState<IUser[]>(users);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (queryGroupId) {
+      getUsers(queryGroupId).then(fetched => {
+        if (isMounted) setGroupUsers(fetched);
+      });
+    } else {
+      setGroupUsers(users);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [queryGroupId, users]);
+
+  // Find the currently logged-in user in DB
+  const currentDbUser =
+    groupUsers.find(u => u.clerkId === clerkUser?.id || u.id === clerkUser?.id) || users.find(u => u.clerkId === clerkUser?.id || u.id === clerkUser?.id);
+  const currentUserId = currentDbUser?.id || clerkUser?.id || "";
 
   const form = useForm<TEventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
-      user: users[0]?.id || "",
+      user: currentDbUser?.id || clerkUser?.id || groupUsers[0]?.id || "unassigned",
       title: "",
       description: "",
       startDate: typeof startDate !== "undefined" ? startDate : undefined,
@@ -68,8 +91,10 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
   });
 
   const onSubmit = async (values: TEventFormData) => {
-    const user = users.find(u => u.id === values.user) || users[0];
-    if (!user) return;
+    // values.user is the chosen Assignee among group users
+    const assignedUser =
+      values.user && values.user !== "unassigned" ? groupUsers.find(u => u.id === values.user) || users.find(u => u.id === values.user) || null : null;
+    const assigneeId = assignedUser?.id || (values.user && values.user !== "unassigned" ? values.user : undefined);
 
     const startDateTime = new Date(values.startDate);
     startDateTime.setHours(values.startTime.hour, values.startTime.minute);
@@ -77,7 +102,15 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
     const endDateTime = new Date(values.endDate);
     endDateTime.setHours(values.endTime.hour, values.endTime.minute);
 
-    const targetGroupId = values.groupId || queryGroupId || selectedGroupId || undefined;
+    const targetGroupId = queryGroupId || undefined;
+
+    // Creator is ALWAYS the current logged-in user
+    const creatorUser = currentDbUser || {
+      id: currentUserId,
+      clerkId: clerkUser?.id,
+      name: clerkUser?.fullName || clerkUser?.username || "You",
+      picturePath: clerkUser?.imageUrl,
+    };
 
     const tempId = `temp-${Date.now()}`;
     const newEvent: IEvent = {
@@ -87,7 +120,11 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
       startDate: startDateTime.toISOString(),
       endDate: endDateTime.toISOString(),
       color: values.color,
-      user,
+      user: creatorUser,
+      creatorId: currentUserId,
+      creator: creatorUser,
+      assigneeId: assigneeId,
+      assignee: assignedUser,
       groupId: targetGroupId,
       status: values.status,
       priority: values.priority,
@@ -105,13 +142,14 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
           startDate: startDateTime.toISOString(),
           endDate: endDateTime.toISOString(),
           color: values.color,
-          userId: user.id,
+          userId: currentUserId || assignedUser?.id || users[0]?.id || "", // Creator ID = logged in user
+          assigneeId: assigneeId, // Assignee ID = selected user
           groupId: targetGroupId,
           status: values.status,
           priority: values.priority,
         });
         if (created?.id) {
-          setLocalEvents(prev => prev.map(e => (e.id === tempId ? { ...e, id: created.id } : e)));
+          setLocalEvents(prev => prev.map(e => (e.id === tempId ? { ...e, ...created, id: created.id } : e)));
         }
         window.dispatchEvent(new CustomEvent("events-updated"));
       } catch {
@@ -122,8 +160,9 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
 
   useEffect(() => {
     if (isOpen) {
+      const defaultAssignee = currentDbUser?.id || clerkUser?.id || (groupUsers.length > 0 ? groupUsers[0]?.id : "unassigned");
       form.reset({
-        user: users[0]?.id || "",
+        user: defaultAssignee,
         title: "",
         description: "",
         startDate,
@@ -134,7 +173,7 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
         priority: "MEDIUM",
       });
     }
-  }, [isOpen, startDate, startTime, queryGroupId, users, form]);
+  }, [isOpen, startDate, startTime, queryGroupId, groupUsers, currentDbUser?.id, clerkUser?.id, form]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onToggle}>
@@ -142,81 +181,52 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            Add New Event to group
-            <span className={cn("ml-1 font-medium", currentGroup?.color ? `text-${currentGroup?.color}-500` : "text-blue-500")}>
-              {currentGroup?.name ? `${currentGroup.name}` : ""}
-            </span>
-          </DialogTitle>
+          <DialogTitle>Add New Event</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh]">
           <Form {...form}>
             <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="grid space-y-1 p-1">
-              <div className="grid grid-cols-2 gap-2">
-                <FormField
-                  control={form.control}
-                  name="user"
-                  render={({ field, fieldState }) => (
-                    <FormItem>
-                      <FormLabel>Responsible</FormLabel>
-                      <FormControl>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger data-invalid={fieldState.invalid}>
-                            <SelectValue placeholder="Select an option" />
-                          </SelectTrigger>
+              <FormField
+                control={form.control}
+                name="user"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel>Assignee</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger data-invalid={fieldState.invalid}>
+                          <SelectValue placeholder="Select an assignee" />
+                        </SelectTrigger>
 
-                          <SelectContent>
-                            {users.map(user => (
-                              <SelectItem key={user.id} value={user.id} className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <Avatar key={user.id} className="size-6">
-                                    <AvatarImage src={user.picturePath ?? undefined} alt={user.name} />
-                                    <AvatarFallback className="text-xxs">{user.name[0]}</AvatarFallback>
-                                  </Avatar>
+                        <SelectContent>
+                          <SelectItem value="unassigned" className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <User className="size-3.5" />
+                              </div>
+                              <p className="truncate italic text-muted-foreground">Unassigned</p>
+                            </div>
+                          </SelectItem>
+                          {groupUsers.map(user => (
+                            <SelectItem key={user.id} value={user.id} className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Avatar key={user.id} className="size-6">
+                                  <AvatarImage src={user.picturePath ?? undefined} alt={user.name} />
+                                  <AvatarFallback className="text-xxs">{user.name[0]}</AvatarFallback>
+                                </Avatar>
 
-                                  <p className="truncate">{user.name}</p>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {groups.length > 0 && (
-                  <FormField
-                    control={form.control}
-                    name="groupId"
-                    render={({ field, fieldState }) => (
-                      <FormItem>
-                        <FormLabel>Group</FormLabel>
-                        <FormControl>
-                          <Select value={field.value || ""} onValueChange={field.onChange}>
-                            <SelectTrigger data-invalid={fieldState.invalid}>
-                              <SelectValue placeholder="Select a group" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {groups.map(group => (
-                                <SelectItem key={group.id} value={group.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span className={cn("size-2.5 rounded-full", COLOR_MAP[group.color || "gray"] || "bg-slate-400")} />
-                                    <span>{group.name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                                <p className="truncate">{user.name}</p>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
+              />
 
               <FormField
                 control={form.control}

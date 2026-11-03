@@ -2,7 +2,7 @@
 
 import { parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, User } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { useDisclosure } from "@/hooks/use-disclosure";
@@ -37,10 +37,12 @@ export function EditEventDialog({ children, event }: IProps) {
 
   const { updateEvent } = useUpdateEvent();
 
+  const defaultAssigneeId = event.assigneeId || event.assignee?.id || (event.user ? event.user.id : "unassigned");
+
   const form = useForm<TEventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
-      user: event.user.id,
+      user: defaultAssigneeId,
       title: event.title,
       description: event.description,
       startDate: parseISO(event.startDate),
@@ -52,9 +54,8 @@ export function EditEventDialog({ children, event }: IProps) {
   });
 
   const onSubmit = (values: TEventFormData) => {
-    const user = users.find(user => user.id === values.user);
-
-    if (!user) throw new Error("User not found");
+    const assignedUser = values.user && values.user !== "unassigned" ? users.find(u => u.id === values.user) || null : null;
+    const assigneeId = assignedUser?.id || (values.user && values.user !== "unassigned" ? values.user : null);
 
     const startDateTime = new Date(values.startDate);
     startDateTime.setHours(values.startTime.hour, values.startTime.minute);
@@ -64,7 +65,8 @@ export function EditEventDialog({ children, event }: IProps) {
 
     updateEvent({
       ...event,
-      user,
+      assignee: assignedUser,
+      assigneeId: assigneeId,
       title: values.title,
       color: values.color,
       description: values.description,
@@ -96,14 +98,22 @@ export function EditEventDialog({ children, event }: IProps) {
               name="user"
               render={({ field, fieldState }) => (
                 <FormItem>
-                  <FormLabel>Responsible</FormLabel>
+                  <FormLabel>Assignee</FormLabel>
                   <FormControl>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger data-invalid={fieldState.invalid}>
-                        <SelectValue placeholder="Select an option" />
+                        <SelectValue placeholder="Select an assignee" />
                       </SelectTrigger>
 
                       <SelectContent>
+                        <SelectItem value="unassigned" className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                              <User className="size-3.5" />
+                            </div>
+                            <p className="truncate italic text-muted-foreground">Unassigned</p>
+                          </div>
+                        </SelectItem>
                         {users.map(user => (
                           <SelectItem key={user.id} value={user.id} className="flex-1">
                             <div className="flex items-center gap-2">
@@ -291,9 +301,9 @@ export function EditEventDialog({ children, event }: IProps) {
                 <FormItem>
                   <FormLabel>Description</FormLabel>
 
-                  <FormControl>
-                    <Textarea {...field} value={field.value} data-invalid={fieldState.invalid} />
-                  </FormControl>
+                    <FormControl>
+                      <Textarea {...field} value={field.value} data-invalid={fieldState.invalid} />
+                    </FormControl>
 
                   <FormMessage />
                 </FormItem>

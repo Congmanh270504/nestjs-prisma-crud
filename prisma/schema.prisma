@@ -33,19 +33,6 @@ enum TaskPriority {
   URGENT
 }
 
-enum ReminderChannel {
-  EMAIL
-  IN_APP
-  WEBHOOK
-}
-
-enum ReminderStatus {
-  SCHEDULED
-  SENT
-  CANCELLED
-  FAILED
-}
-
 model Groups {
   id        String    @id @default(uuid())
   name      String

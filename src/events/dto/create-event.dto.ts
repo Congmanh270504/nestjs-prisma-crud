@@ -28,6 +28,10 @@ export class CreateEventDto {
 
   @IsString()
   @IsOptional()
+  assigneeId?: string;
+
+  @IsString()
+  @IsOptional()
   groupId?: string;
 
   @IsEnum(TaskStatus)

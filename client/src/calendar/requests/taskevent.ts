@@ -30,6 +30,7 @@ export const createEventApi = async (eventData: {
   endDate: string;
   color: string;
   userId: string;
+  assigneeId?: string | null;
   groupId?: string;
   status?: string;
   priority?: string;
@@ -50,17 +51,29 @@ export const updateEventApi = async (id: string | number, eventData: Partial<IEv
   if (eventData.startDate !== undefined) payload.startDate = eventData.startDate;
   if (eventData.endDate !== undefined) payload.endDate = eventData.endDate;
   if (eventData.color !== undefined) payload.color = eventData.color;
-  if (eventData.user?.id) payload.userId = eventData.user.id;
+  if (eventData.creatorId) {
+    payload.userId = eventData.creatorId;
+  } else if (eventData.user?.id) {
+    payload.userId = eventData.user.id;
+  }
+  if (eventData.assigneeId !== undefined) {
+    payload.assigneeId = eventData.assigneeId;
+  } else if (eventData.assignee?.id) {
+    payload.assigneeId = eventData.assignee.id;
+  }
   if (eventData.groupId !== undefined) payload.groupId = eventData.groupId;
-  if (eventData.status !== undefined) payload.status = eventData.status;
-  if (eventData.priority !== undefined) payload.priority = eventData.priority;
+  if (eventData.status !== undefined && eventData.status) payload.status = eventData.status;
+  if (eventData.priority !== undefined && eventData.priority) payload.priority = eventData.priority;
 
   const res = await fetch(`${API_BASE_URL}/events/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("Failed to update event");
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Failed to update event: ${res.status} ${errText}`);
+  }
   return res.json();
 };
 

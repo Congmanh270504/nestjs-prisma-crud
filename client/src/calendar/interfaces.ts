@@ -7,13 +7,6 @@ export interface IUser {
   picturePath?: string | null;
 }
 
-export interface IReminder {
-  id: string;
-  remindAt: string;
-  status: string;
-  channel: string;
-}
-
 export interface IEvent {
   id: string | number;
   startDate: string;
@@ -22,12 +15,17 @@ export interface IEvent {
   color: TEventColor;
   description: string;
   user: IUser;
+  creatorId?: string;
+  creator?: IUser;
+  assigneeId?: string | null;
+  assignee?: IUser | null;
   status?: string;
   priority?: string;
   groupId?: string;
   group?: { id: string; name: string; color?: string | null } | null;
   project?: { id: string; name: string; color: string } | null;
-  reminders?: IReminder[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ICalendarCell {
